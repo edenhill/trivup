@@ -11,4 +11,4 @@ broker versions.
 **NOTE**: It currently only operates on localhost.
 
 
-See tests/use-case.py for a small showcase.
+See [tests/usecase.py](tests/usecase.py) for a small showcase.
