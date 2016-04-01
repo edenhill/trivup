@@ -1,0 +1,6 @@
+This directory contains apps submodules with filenames named after their
+classes.
+
+Each app may optionally have a sub-directory (same name as class) containing
+resource files, such as config templates.
+

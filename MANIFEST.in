@@ -1,0 +1,2 @@
+recursive-include trivup/apps *App/*
+recursive-exclude trivup *~

@@ -1,0 +1,4 @@
+dataDir=${datadir}
+clientPort=${port}
+# disable the per-ip limit on the number of connections since this is a non-production config
+maxClientCnxns=0

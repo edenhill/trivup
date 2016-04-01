@@ -1,0 +1,13 @@
+# trivup KafkaBrokerApp template config file
+broker.id=${port}
+port=${port}
+reserved.broker.max.id=65536
+listeners=${listeners}
+advertised.host.name=${nodename}
+log.dir=${log_dirs}
+log.dirs=${log_dirs}
+num.partitions=${num_partitions}
+zookeeper.connect=${zk_connect}
+auto.create.topics.enable=true
+delete.topic.enable=true
+default.replication.factor=${replication_factor}
