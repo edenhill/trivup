@@ -15,8 +15,7 @@ if __name__ == '__main__':
     zk1 = ZookeeperApp(cluster, bin_path='/home/maglun/src/kafka/bin/zookeeper-server-start.sh')
 
     # Two brokers
-    conf = {'replication_factort': 3,
-            'num_partitions': 4}
+    conf = {'replication_factor': 3, 'num_partitions': 4}
     broker1 = KafkaBrokerApp(cluster, conf, kafka_path='/home/maglun/src/kafka')
     broker2 = KafkaBrokerApp(cluster, conf, kafka_path='/home/maglun/src/kafka')
     broker3 = KafkaBrokerApp(cluster, conf, kafka_path='/home/maglun/src/kafka')
@@ -32,12 +31,7 @@ if __name__ == '__main__':
 
     if not cluster.wait_operational(30):
         print('# Cluster did not go operational: letting you troubleshoot in shell')
-
     print('# Connect to cluster with bootstrap.servers %s' % bootstrap_servers)
-
-    for n in range(1,4):
-        subprocess.call('kafkacat -b %s -L -t test' % bootstrap_servers, shell=True)
-        time.sleep(1)
         
     print('\033[32mCluster started.. Executing interactive shell, exit to stop cluster\033[0m')
     subprocess.call("bash", shell=True)
