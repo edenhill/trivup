@@ -8,7 +8,7 @@ VERSION=$1
 KAFKA_DIR=$2
 
 # refresh gradle and do clean before rebuilding
-CLEAN_BUILD=n
+[[ -z "$CLEAN_BUILD" ]] && CLEAN_BUILD=n
 
 export PATH=$PATH:$HOME/src/gradle-2.11/bin
 
