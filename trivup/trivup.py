@@ -175,8 +175,10 @@ class App (object):
         basename = os.path.dirname(path)
         if not os.path.exists(basename):
             os.makedirs(basename)
-        with open(path, 'w') as f:
+        with open(path, 'wb') as f:
             if data is not None:
+                if type(data) == str:
+                    data = data.encode('ascii')
                 f.write(data)
 
         return path
@@ -195,7 +197,7 @@ class App (object):
             raise FileNotFoundError('Class %s resource %s not found' %
                                     ('trivup', tpath))
 
-        rendered = Template(filedata).substitute(self.conf)
+        rendered = Template(filedata.decode('ascii')).substitute(self.conf)
         return self.create_file(relpath, unique, data=rendered)
 
 
