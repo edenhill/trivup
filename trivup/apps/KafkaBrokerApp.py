@@ -131,6 +131,9 @@ class KafkaBrokerApp (trivup.App):
 
 
     def deploy (self):
+        if self.get('version') == 'trunk':
+            self.dbg('Refusing to deploy trunk, git tree should be built and ready to go')
+            return
         destdir = os.path.join(self.cluster.mkpath(self.__class__.__name__), 'kafka', self.get('version'))
         self.dbg('Deploy %s version %s on %s to %s' %
                  (self.name, self.get('version'), self.node.name, destdir))
