@@ -72,7 +72,7 @@ class Cluster (object):
                                    Exception on failure.
         """
         for app in self.apps:
-            if app.autostart:
+            if app.autostart and app.status() != 'started':
                 app.start()
             if timeout is not None and not self.wait_operational(timeout):
                 raise Exception('Cluster did not go operational in %ds' % timeout)
