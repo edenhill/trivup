@@ -1,4 +1,6 @@
 from trivup import trivup
+from trivup.apps.KerberosKdcApp import KerberosKdcApp
+
 import os
 import time
 
@@ -13,13 +15,14 @@ class KafkaBrokerApp (trivup.App):
         @param kafka_path  Path to Kafka build tree (for trunk usage)
         @param on          Node name to run on
 
-        Support conf keys:
+        Supported conf keys:
            * version - Kafka version to use, will build 'trunk' from kafka_path,
                        otherwise the version is taken to be a formal release which
                        will be downloaded and deployed.
            * listeners - CSV list of listener types: PLAINTEXT,SSL,SASL,SSL_SASL
            * sasl_mechanisms - CSV list of SASL mechanisms to enable: GSSAPI,PLAIN
-                               *SASL listeners will be added automatically.
+                               SASL listeners will be added automatically.
+                               KerberosKdcApp is required for GSSAPI.
            * sasl_users - CSV list of SASL PLAIN of user=pass for authenticating clients
            * num_partitions - Topic auto-create partition count (3)
            * replication_Factor - Topic auto-create replication factor (1)
@@ -52,7 +55,7 @@ class KafkaBrokerApp (trivup.App):
         ports = [(x, trivup.TcpPortAllocator(self.cluster).next()) for x in sorted(set(listeners))]
         self.conf['port'] = ports[0][1] # "Default" port
         self.conf['address'] = '%(nodename)s:%(port)d' % self.conf
-        self.conf['listeners'] = ','.join(['%s://:%d' % x for x in ports])
+        self.conf['listeners'] = ','.join(['%s://%s:%d' % (x[0], self.node.name, x[1]) for x in ports])
         self.conf['advertised.listeners'] = self.conf['listeners']
         self.dbg('Listeners: %s' % self.conf['listeners'])
 
@@ -62,8 +65,8 @@ class KafkaBrokerApp (trivup.App):
             self.dbg('SASL mechanisms: %s' % sasl_mechs)
             jaas_blob.append('KafkaServer {')
 
+            conf_blob.append('sasl.enabled.mechanisms=%s' % ','.join(sasl_mechs))
             if 'PLAIN' in sasl_mechs:
-                conf_blob.append('sasl.enabled.mechanisms=PLAIN')
                 sasl_users = self.conf.get('sasl_users', '')
                 if len(sasl_users) == 0:
                     self.log('WARNING: No sasl_users configured for PLAIN, expected CSV of user=pass,..')
@@ -73,6 +76,20 @@ class KafkaBrokerApp (trivup.App):
                         u,p = up.split('=')
                         jaas_blob.append('user_%s="%s"' % (u, p))
                     jaas_blob[-1] += ';'
+
+            if 'GSSAPI' in sasl_mechs:
+                conf_blob.append('sasl.kerberos.service.name=%s' % 'kafka')
+                kdc = self.cluster.find_app(KerberosKdcApp)
+                self.env_add('KRB5_CONFIG', kdc.conf['krb5_conf'])
+                self.env_add('KAFKA_OPTS', '-Djava.security.krb5.conf=%s' % kdc.conf['krb5_conf'])
+                self.env_add('KAFKA_OPTS', '-Dsun.security.krb5.debug=true')
+                self.kerberos_principal,self.kerberos_keytab = kdc.add_principal('kafka', self.node.name)
+                jaas_blob.append('com.sun.security.auth.module.Krb5LoginModule required')
+                jaas_blob.append('useKeyTab=true storeKey=true doNotPrompt=true')
+                jaas_blob.append('keyTab="%s"' % self.kerberos_keytab)
+                jaas_blob.append('debug=true')
+                jaas_blob.append('principal="%s";' % self.kerberos_principal)
+
             jaas_blob.append('};\n')
             self.conf['jaas_file'] = self.create_file('jaas_broker.conf', data='\n'.join(jaas_blob))
             self.env_add('KAFKA_OPTS', '-Djava.security.auth.login.config=%s' % self.conf['jaas_file'])

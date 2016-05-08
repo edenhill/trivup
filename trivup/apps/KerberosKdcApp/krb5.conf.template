@@ -1,0 +1,11 @@
+[libdefaults]
+	default_realm = ${realm}
+	rdns = false
+	dns_canonicalize_hostname = false
+	dns_lookup_kdc = false
+
+[realms]
+	${realm} = {
+		kdc = ${nodename}:${port}
+		admin_server = ${nodename}
+	}

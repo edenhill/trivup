@@ -292,16 +292,25 @@ class App (object):
         """ @return Command line to start application. """
         return self.conf['start_cmd']
 
+    def execute (self, cmd, stdout_fd=None, stderr_fd=None):
+        """ Execute command, returns the subprocess handle """
+        cmd = self.node.exec_cmd + cmd
+        self.dbg('Executing: %s' % cmd)
+        proc = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid,
+                                env=dict(os.environ, **self.env),
+                                stdout=stdout_fd, stderr=stderr_fd)
+        return proc
+
     def run (self):
         """ Run application using conf \p start_cmd """
-        cmd = self.node.exec_cmd + self.start_cmd()
-        self.dbg('Starting: %s' % cmd)
         self.dbg('Environment: %s' % str(self.env))
         self.stdout_fd = open(self.mkpath('stdout.log', 'log'), 'a')
         self.stderr_fd = open(self.mkpath('stderr.log', 'log'), 'a')
-        self.proc = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid,
-                                     env=dict(os.environ, **self.env),
-                                     stdout=self.stdout_fd, stderr=self.stderr_fd)
+        self.proc = self.execute(self.start_cmd(),
+                                 stdout_fd=self.stdout_fd,
+                                 stderr_fd=self.stderr_fd)
+
+
         
     def start (self):
         if self.state == 'started':
