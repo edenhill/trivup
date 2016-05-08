@@ -54,12 +54,12 @@ class KafkaBrokerApp (trivup.App):
         self.conf['address'] = '%(nodename)s:%(port)d' % self.conf
         self.conf['listeners'] = ','.join(['%s://:%d' % x for x in ports])
         self.conf['advertised.listeners'] = self.conf['listeners']
-        self.log('Listeners: %s' % self.conf['listeners'])
+        self.dbg('Listeners: %s' % self.conf['listeners'])
 
         self.conf['kafka_path'] = kafka_path
 
         if len(sasl_mechs) > 0:
-            self.log('SASL mechanisms: %s' % sasl_mechs)
+            self.dbg('SASL mechanisms: %s' % sasl_mechs)
             jaas_blob.append('KafkaServer {')
 
             if 'PLAIN' in sasl_mechs:
@@ -107,14 +107,14 @@ class KafkaBrokerApp (trivup.App):
         self.conf['stop_cmd'] = None # Ctrl-C
 
     def operational (self):
-        self.log('Checking if operational')
+        self.dbg('Checking if operational')
         return os.system('(echo anything | nc %s) 2>/dev/null' %
                          ' '.join(self.get('address').split(':'))) == 0
 
 
     def deploy (self):
         destdir = os.path.join(self.cluster.mkpath(self.__class__.__name__), 'kafka', self.get('version'))
-        self.log('Deploy %s version %s on %s to %s' %
+        self.dbg('Deploy %s version %s on %s to %s' %
                  (self.name, self.get('version'), self.node.name, destdir))
         deploy_exec = self.resource_path('deploy.sh')
         if not os.path.exists(deploy_exec):
@@ -126,9 +126,9 @@ class KafkaBrokerApp (trivup.App):
         r = os.system(cmd)
         if r != 0:
             raise Exception('Deploy "%s" returned exit code %d' % (cmd, r))
-        self.log('Deployed version %s in %ds' %
+        self.dbg('Deployed version %s in %ds' %
                  (self.get('version'), time.time() - t_start))
 
         # Override start command with updated path.
         self.conf['start_cmd'] = '%s/bin/kafka-server-start.sh %s' % (destdir, self.conf['conf_file'])
-        self.log('Updated start_cmd to %s' % self.conf['start_cmd'])
+        self.dbg('Updated start_cmd to %s' % self.conf['start_cmd'])

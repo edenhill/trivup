@@ -24,10 +24,11 @@ class ZookeeperApp (trivup.App):
             self.conf['start_cmd'] = '%s %s' % (bin_path, self.conf['conf_file'])
 
     def operational (self):
-        self.log('Checking if operational')
+        self.dbg('Checking if operational')
         return os.system('(echo stat | nc %s | grep -q Zookeeper.version) 2>/dev/null' %
                          ' '.join(self.get('address').split(':'))) == 0
 
     
     def deploy (self):
-        self.log('Deploy is a no-op for ZK since it is run from Kafka dir')
+        """ Deploy is a no-op for ZK since it is run from Kafka dir """
+        pass

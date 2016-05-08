@@ -15,8 +15,9 @@ import random
 import socket
 
 class Cluster (object):
-    def __init__(self, name, root_path, nodes=['localhost']):
+    def __init__(self, name, root_path, nodes=['localhost'], debug=False):
         super(Cluster, self).__init__()
+        self.debug = debug
         self.name = name
         self.instance = str(int(time.time()))[2:]
         self.nodes = dict()
@@ -28,6 +29,13 @@ class Cluster (object):
         self.root_path = os.path.join(os.path.abspath(root_path), name)
 
         self.appid_next = 1
+
+    def log (self, msg):
+        print('%s-%s: %s' % (self.name, msg))
+
+    def dbg (self, msg):
+        if self.debug:
+            return self.log(msg)
 
     def find_node (self, nodename):
         return self.nodes.get(nodename, None)
@@ -87,12 +95,12 @@ class Cluster (object):
             stopped = [x for x in self.apps if x.status() == 'stopped']
             if len(not_oper) == 0:
                 if len(stopped) > 0:
-                    print('### %d apps terminated while waiting to go operational: %s' % \
+                    self.log('%d apps terminated while waiting to go operational: %s' % \
                           (len(stopped), ', '.join([str(x) for x in stopped])))
                     return False
                 return True
-            print('# Waiting for %d apps to go operational: %s' %
-                  (len(not_oper), ', '.join([str(x) for x in not_oper])))
+            self.dbg('Waiting for %d apps to go operational: %s' %
+                     (len(not_oper), ', '.join([str(x) for x in not_oper])))
             time.sleep(1)
         return False
 
@@ -162,6 +170,7 @@ class App (object):
         self.env = defaultdict(list)
         # List {'type': .., 'path': ..} tuples of created paths, for cleanup
         self.paths = list()
+        self.debug = cluster.debug
 
         self.t_started = 0
         self.t_stopped = 0
@@ -189,11 +198,15 @@ class App (object):
         self._root_path = os.path.join(cluster.root_path, cluster.instance,
                                        self.name)
         self.state = 'init'
-        self.log('Creating %s instance' % self.name)
+        self.dbg('Creating %s instance' % self.name)
         
 
     def log (self, msg):
         print('%s-%s: %s' % (self.name, self.appid, msg))
+
+    def dbg (self, msg):
+        if self.debug:
+            return self.log(msg)
 
     def get(self, key, defval=None):
         """ Return conf value for \p key, or \p defval if not found. """
@@ -282,8 +295,8 @@ class App (object):
     def run (self):
         """ Run application using conf \p start_cmd """
         cmd = self.node.exec_cmd + self.start_cmd()
-        self.log('Starting: %s' % cmd)
-        self.log('Environment: %s' % str(self.env))
+        self.dbg('Starting: %s' % cmd)
+        self.dbg('Environment: %s' % str(self.env))
         self.stdout_fd = open(self.mkpath('stdout.log', 'log'), 'a')
         self.stderr_fd = open(self.mkpath('stderr.log', 'log'), 'a')
         self.proc = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid,
@@ -312,9 +325,9 @@ class App (object):
             time.sleep(0.5)
 
         if self.proc.poll() is None:
-            self.log('still alive')
+            self.dbg('still alive')
             if force:
-                self.log('forcing termination')
+                self.dbg('forcing termination')
                 os.killpg(os.getpgid(self.proc.pid), signal.SIGKILL)
                 self.proc.wait(1)
             else:
@@ -330,7 +343,7 @@ class App (object):
         if self.state != 'started':
             return
 
-        self.log('Stopping')
+        self.dbg('Stopping')
         os.killpg(os.getpgid(self.proc.pid), signal.SIGTERM)
 
         if wait_term:
@@ -339,7 +352,7 @@ class App (object):
         else:
             self.state = 'stopped'
 
-        self.log('now %s, runtime %ds' % (self.state, self.runtime()))
+        self.dbg('now %s, runtime %ds' % (self.state, self.runtime()))
         
         self.stdout_fd.close()
         self.stderr_fd.close()
@@ -349,7 +362,10 @@ class App (object):
     def status (self):
         if self.state == 'started' and self.proc is not None and self.proc.poll() is not None:
             r = self.proc.wait()
-            self.log('process terminated: returncode %s' % (str(r)))
+            if r != 0:
+                self.log('process terminated: returncode %s' % (str(r)))
+            else:
+                self.dbg('process terminated: returncode %s' % (str(r)))
             self.state = 'stopped'
         return self.state
 
@@ -376,7 +392,7 @@ class App (object):
         """ Remove all dirs and files created by App """
         if not self.do_cleanup:
             return
-        self.log('Cleaning up %d path(s) (keeptypes=%s)' %
+        self.dbg('Cleaning up %d path(s) (keeptypes=%s)' %
                  (len(self.paths), ','.join(keeptypes)))
         for p in self.paths:
             path = p['path']
@@ -384,14 +400,14 @@ class App (object):
                 continue
             if keeptypes is not None and p['type'] in keeptypes:
                 continue
-            self.log('Cleanup: %s' % path)
+            self.dbg('Cleanup: %s' % path)
             try:
                 if os.path.isdir(path):
                     shutil.rmtree(path)
                 else:
                     os.remove(path)
             except Exception as e:
-                self.log('Remove %s failed: %s: ignoring' % (path, str(e)))
+                self.dbg('Remove %s failed: %s: ignoring' % (path, str(e)))
 
     def runtime (self):
         if self.t_stopped < 1:
