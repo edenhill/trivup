@@ -31,7 +31,7 @@ class Cluster (object):
         self.appid_next = 1
 
     def log (self, msg):
-        print('%s-%s: %s' % (self.name, msg))
+        print('%s: %s' % (self.name, msg))
 
     def dbg (self, msg):
         if self.debug:
