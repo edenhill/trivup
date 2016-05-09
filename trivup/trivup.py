@@ -188,6 +188,7 @@ class App (object):
         else:
             self.conf = deepcopy(conf)
 
+        self.conf['appid'] = self.appid
         self.conf['name'] = self.name
         self.conf['nodename'] = self.node.name
 
