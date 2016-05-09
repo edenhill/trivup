@@ -40,7 +40,7 @@ class KerberosKdcApp (trivup.App):
         self.conf['stop_cmd'] = None # Ctrl-C
 
     def operational (self):
-        self.log('Checking if operational: FIXME')
+        self.dbg('Checking if operational: FIXME')
         return True
         #return os.system('(echo anything | nc %s) 2>/dev/null' %
         #' '.join(self.get('address').split(':'))) == 0
