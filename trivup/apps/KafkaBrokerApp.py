@@ -117,6 +117,7 @@ class KafkaBrokerApp (trivup.App):
         # Runs in foreground, stopped by Ctrl-C
         # This is the default for no-deploy use: will be overwritten by deploy() if enabled.
         if kafka_path:
+            self.conf['destdir'] = kafka_path
             start_sh = os.path.join(kafka_path, 'bin', 'kafka-server-start.sh')
         else:
             start_sh = 'kafka-server-start.sh'
@@ -150,6 +151,7 @@ class KafkaBrokerApp (trivup.App):
         self.dbg('Deployed version %s in %ds' %
                  (self.get('version'), time.time() - t_start))
 
+        self.conf['destdir'] = destdir
         # Override start command with updated path.
         self.conf['start_cmd'] = '%s/bin/kafka-server-start.sh %s' % (destdir, self.conf['conf_file'])
         self.dbg('Updated start_cmd to %s' % self.conf['start_cmd'])

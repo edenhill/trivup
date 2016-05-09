@@ -1,5 +1,5 @@
 # trivup KafkaBrokerApp template config file
-broker.id=${port}
+broker.id=${appid}
 port=${port}
 reserved.broker.max.id=65536
 listeners=${listeners}
