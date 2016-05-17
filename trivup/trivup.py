@@ -168,6 +168,7 @@ class App (object):
         self.do_cleanup = True
         # Environment variables applied to execution
         self.env = defaultdict(list)
+        self.env_add('LC_ALL', 'C')
         # List {'type': .., 'path': ..} tuples of created paths, for cleanup
         self.paths = list()
         self.debug = cluster.debug
@@ -198,6 +199,10 @@ class App (object):
         # Runtime root path (runtime created files)
         self._root_path = os.path.join(cluster.root_path, cluster.instance,
                                        self.name)
+
+        # Create root path dir
+        self.create_dir('')
+
         self.state = 'init'
         self.dbg('Creating %s instance' % self.name)
         
@@ -219,6 +224,7 @@ class App (object):
     def add_path (self, relpath, pathtype):
         """ Add path for future use by cleanup() et.al. """
         self.paths.append({'path': relpath, 'type': pathtype})
+        return relpath
 
     def mkpath (self, relpath, pathtype='temp', unique=False):
         """ pathtype := perm, temp, log """
@@ -294,12 +300,31 @@ class App (object):
         return self.conf['start_cmd']
 
     def execute (self, cmd, stdout_fd=None, stderr_fd=None):
-        """ Execute command, returns the subprocess handle """
+        """
+        Execute command, returns the subprocess handle
+        
+        @param stdout_fd, stderr_fd: either None (for no redirect), a fd,
+                                     or a string (to open and append to file)
+        """
         cmd = self.node.exec_cmd + cmd
         self.dbg('Executing: %s' % cmd)
+
+        to_close = list()
+        if type(stdout_fd) == str:
+            f = open(stdout_fd, 'a')
+            stdout_fd = f.fileno()
+            to_close.append(f)
+        if type(stderr_fd) == str:
+            f = open(stderr_fd, 'a')
+            stderr_fd = f.fileno()
+            to_close.append(f)
+
         proc = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid,
                                 env=dict(os.environ, **self.env),
                                 stdout=stdout_fd, stderr=stderr_fd)
+        for f in to_close:
+            f.close()
+
         return proc
 
     def run (self):
@@ -316,6 +341,8 @@ class App (object):
     def start (self):
         if self.state == 'started':
             raise Exception('%s already started' % self.name)
+        elif self.start_cmd() is None:
+            return
 
         self.run()
         self.state = 'started'

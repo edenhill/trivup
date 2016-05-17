@@ -19,7 +19,7 @@ class KafkaBrokerApp (trivup.App):
            * version - Kafka version to use, will build 'trunk' from kafka_path,
                        otherwise the version is taken to be a formal release which
                        will be downloaded and deployed.
-           * listeners - CSV list of listener types: PLAINTEXT,SSL,SASL,SSL_SASL
+           * listeners - CSV list of listener types: PLAINTEXT,SSL,SASL,SASL_SSL
            * sasl_mechanisms - CSV list of SASL mechanisms to enable: GSSAPI,PLAIN
                                SASL listeners will be added automatically.
                                KerberosKdcApp is required for GSSAPI.
@@ -50,6 +50,13 @@ class KafkaBrokerApp (trivup.App):
         sasl_mechs = [x for x in self.conf.get('sasl_mechanisms', '').replace(' ', '').split(',') if len(x) > 0]
         if len(sasl_mechs) > 0:
             listeners.append('SASL_PLAINTEXT')
+
+        # SSL support
+        if getattr(cluster, 'ssl', None) is not None:
+            # Add SSL listeners
+            listeners.append('SSL')
+            if len(sasl_mechs) > 0:
+                listeners.append('SASL_SSL')
 
         # Create listeners
         ports = [(x, trivup.TcpPortAllocator(self.cluster).next()) for x in sorted(set(listeners))]
@@ -95,6 +102,20 @@ class KafkaBrokerApp (trivup.App):
             self.env_add('KAFKA_OPTS', '-Djava.security.auth.login.config=%s' % self.conf['jaas_file'])
             self.env_add('KAFKA_OPTS', '-Djava.security.debug=all')
 
+        # SSL config and keys (et.al.)
+        if getattr(cluster, 'ssl', None) is not None:
+            ssl = cluster.ssl
+            keystore,truststore,_,_ = ssl.create_keystore('broker%s' % self.appid)
+            conf_blob.append('ssl.protocol=TLS')
+            conf_blob.append('ssl.enabled.protocols=TLSv1.2,TLSv1.1,TLSv1')
+            conf_blob.append('ssl.keystore.type = JKS')
+            conf_blob.append('ssl.keystore.location = %s' % keystore)
+            conf_blob.append('ssl.keystore.password = %s ' % ssl.conf.get('ssl_key_pass'))
+            conf_blob.append('ssl.key.password = %s' % ssl.conf.get('ssl_key_pass'))
+            conf_blob.append('ssl.truststore.type = JKS')
+            conf_blob.append('ssl.truststore.location = %s' % truststore)
+            conf_blob.append('ssl.truststore.password = %s' % ssl.conf.get('ssl_key_pass'))
+            conf_blob.append('ssl.client.auth = required')
 
         # Kafka Configuration properties
         self.conf['log_dirs'] = self.create_dir('logs')
