@@ -29,6 +29,8 @@ class Cluster (object):
         self.root_path = os.path.join(os.path.abspath(root_path), name)
 
         self.appid_next = 1
+        # Allocated TcpPortAllocator ports
+        self.tcp_ports = dict()
 
     def log (self, msg):
         print('%s: %s' % (self.name, msg))
@@ -128,17 +130,39 @@ class Allocator (object):
 
 
 class TcpPortAllocator (Allocator):
-    def next (self):
+    def next (self, port_base=None):
         """ Let the kernel allocate a port number by opening a TCP socket,
             then closing it and return the port number.
             Linux tries to avoid returning the same port again, so this should
             work...
         """
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(('', 0))
-        port = s.getsockname()[1]
-        s.close()
-        return port
+        if port_base is not None:
+            port = port_base
+        else:
+            port = 0
+
+        for i in range(1, 100):
+            s = None
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.bind(('', port))
+                port = s.getsockname()[1]
+                s.close()
+            except:
+                if s is not None:
+                    s.close()
+                if port_base is not None:
+                    port += 1
+                    continue
+                raise
+            if self.cluster.tcp_ports.get(port, False):
+                port += 1
+                continue
+            self.cluster.tcp_ports[port] = True
+            return port
+
+        raise Exception("Could not allocate port (port_base=%s) in 100 attempts" % port_base)
+
 
 class UuidAllocator (Allocator):
     @staticmethod

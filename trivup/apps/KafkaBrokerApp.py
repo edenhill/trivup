@@ -26,6 +26,7 @@ class KafkaBrokerApp (trivup.App):
            * sasl_users - CSV list of SASL PLAIN of user=pass for authenticating clients
            * num_partitions - Topic auto-create partition count (3)
            * replication_Factor - Topic auto-create replication factor (1)
+           * port_base - Low TCP port base to start allocating from (random)
         """
         super(KafkaBrokerApp, self).__init__(cluster, conf=conf, on=on)
 
@@ -59,7 +60,7 @@ class KafkaBrokerApp (trivup.App):
                 listeners.append('SASL_SSL')
 
         # Create listeners
-        ports = [(x, trivup.TcpPortAllocator(self.cluster).next()) for x in sorted(set(listeners))]
+        ports = [(x, trivup.TcpPortAllocator(self.cluster).next(self.conf.get('port_base', None))) for x in sorted(set(listeners))]
         self.conf['port'] = ports[0][1] # "Default" port
         self.conf['address'] = '%(nodename)s:%(port)d' % self.conf
         self.conf['listeners'] = ','.join(['%s://%s:%d' % (x[0], self.node.name, x[1]) for x in ports])
