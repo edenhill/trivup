@@ -8,11 +8,10 @@ import time
 class KafkaBrokerApp (trivup.App):
     """ Kafka broker app
         Depends on ZookeeperApp """
-    def __init__(self, cluster, conf=None, on=None, kafka_path=None):
+    def __init__(self, cluster, conf=None, on=None):
         """
         @param cluster     Current cluster
         @param conf        Configuration dict, see below.
-        @param kafka_path  Path to Kafka build tree (for trunk usage)
         @param on          Node name to run on
 
         Supported conf keys:
@@ -27,6 +26,7 @@ class KafkaBrokerApp (trivup.App):
            * num_partitions - Topic auto-create partition count (3)
            * replication_Factor - Topic auto-create replication factor (1)
            * port_base - Low TCP port base to start allocating from (random)
+           * kafka_path - Path to Kafka build tree (for trunk usage)
         """
         super(KafkaBrokerApp, self).__init__(cluster, conf=conf, on=on)
 
@@ -66,8 +66,6 @@ class KafkaBrokerApp (trivup.App):
         self.conf['listeners'] = ','.join(['%s://%s:%d' % (x[0], self.node.name, x[1]) for x in ports])
         self.conf['advertised.listeners'] = self.conf['listeners']
         self.dbg('Listeners: %s' % self.conf['listeners'])
-
-        self.conf['kafka_path'] = kafka_path
 
         if len(sasl_mechs) > 0:
             self.dbg('SASL mechanisms: %s' % sasl_mechs)
@@ -138,9 +136,10 @@ class KafkaBrokerApp (trivup.App):
 
         # Runs in foreground, stopped by Ctrl-C
         # This is the default for no-deploy use: will be overwritten by deploy() if enabled.
-        if kafka_path:
-            self.conf['destdir'] = kafka_path
-            start_sh = os.path.join(kafka_path, 'bin', 'kafka-server-start.sh')
+        if self.conf.get('kafka_path', None) is not None:
+            self.conf['destdir'] = self.conf['kafka_path']
+            self.conf['bindir'] = os.path.join(self.conf['destdir'], 'bin')
+            start_sh = os.path.join(self.conf['bindir'], 'kafka-server-start.sh')
         else:
             start_sh = 'kafka-server-start.sh'
 
@@ -166,7 +165,7 @@ class KafkaBrokerApp (trivup.App):
                                       deploy_exec)
         t_start = time.time()
         cmd = '%s %s "%s" "%s"' % \
-              (deploy_exec, self.get('version'), self.get('kafka_path'), destdir)
+              (deploy_exec, self.get('version'), self.get('kafka_path', None), destdir)
         r = os.system(cmd)
         if r != 0:
             raise Exception('Deploy "%s" returned exit code %d' % (cmd, r))
@@ -174,6 +173,7 @@ class KafkaBrokerApp (trivup.App):
                  (self.get('version'), time.time() - t_start))
 
         self.conf['destdir'] = destdir
+        self.conf['bindir'] = os.path.join(self.conf['destdir'], 'bin')
         # Override start command with updated path.
         self.conf['start_cmd'] = '%s/bin/kafka-server-start.sh %s' % (destdir, self.conf['conf_file'])
         self.dbg('Updated start_cmd to %s' % self.conf['start_cmd'])

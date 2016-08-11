@@ -1,4 +1,5 @@
 from trivup import trivup
+from trivup.apps.KafkaBrokerApp import KafkaBrokerApp
 import os
 
 class ZookeeperApp (trivup.App):
@@ -8,7 +9,10 @@ class ZookeeperApp (trivup.App):
         """
         @param cluster     Current cluster
         @param on          Node name to run on
-        @param bin_path    Path to zookeeper-server-start.sh
+
+        Config:
+          bindir    Path to zookeeper-server-start.sh directory (optional)
+                    Falls back to Kafka bindir
 
         Exposes 'address' (host:port) for other apps.
         """
@@ -20,8 +24,18 @@ class ZookeeperApp (trivup.App):
         self.conf['conf_file'] = self.create_file_from_template('zookeeper.properties',
                                                            self.conf)
 
-        if bin_path:
-            self.conf['start_cmd'] = '%s %s' % (bin_path, self.conf['conf_file'])
+    def start_cmd(self):
+        bindir = self.get('bindir', None)
+        if bindir is None:
+            k = self.cluster.find_app(KafkaBrokerApp)
+            if k is not None:
+                bindir = k.get('bindir', None)
+
+        zkbin = 'zookeeper-server-start.sh'
+        if bindir:
+            zkbin = os.path.join(bindir, zkbin)
+
+        return '%s %s' % (zkbin, self.conf['conf_file'])
 
     def operational (self):
         self.dbg('Checking if operational')

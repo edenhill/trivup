@@ -60,6 +60,7 @@ class Cluster (object):
                     return app
             elif isinstance(app, appclass):
                 return app
+        return None
 
     def deploy (self):
         """ @brief Deploy all apps in cluster """
