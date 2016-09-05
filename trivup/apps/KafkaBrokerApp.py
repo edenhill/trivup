@@ -27,6 +27,7 @@ class KafkaBrokerApp (trivup.App):
            * replication_Factor - Topic auto-create replication factor (1)
            * port_base - Low TCP port base to start allocating from (random)
            * kafka_path - Path to Kafka build tree (for trunk usage)
+           * conf - arbitary server.properties config as a list of strings.
         """
         super(KafkaBrokerApp, self).__init__(cluster, conf=conf, on=on)
 
@@ -39,7 +40,7 @@ class KafkaBrokerApp (trivup.App):
             self.conf['version'] = 'trunk'
 
         # Arbitrary (non-template) configuration statements
-        conf_blob = list()
+        conf_blob = self.conf.get('conf', list())
         jaas_blob = list()
 
         #
