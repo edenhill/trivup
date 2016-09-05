@@ -111,6 +111,10 @@ class Cluster (object):
         """ Retrieve key from all apps, return as list. """
         return [x.get(key, defval) for x in self.apps if isinstance(x, match_class)]
 
+    def instance_path(self):
+        """ Returns the instance path """
+        return os.path.join(self.root_path, self.instance)
+
     def mkpath (self, relpath, unique=False):
         """ Cluster-wide path: will not be cleaned up. """
         path = os.path.join(self.root_path, relpath)
