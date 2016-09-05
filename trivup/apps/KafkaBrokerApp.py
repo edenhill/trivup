@@ -153,9 +153,6 @@ class KafkaBrokerApp (trivup.App):
 
 
     def deploy (self):
-        if self.get('version') == 'trunk':
-            self.dbg('Refusing to deploy trunk, git tree should be built and ready to go')
-            return
         destdir = os.path.join(self.cluster.mkpath(self.__class__.__name__), 'kafka', self.get('version'))
         self.dbg('Deploy %s version %s on %s to %s' %
                  (self.name, self.get('version'), self.node.name, destdir))
@@ -165,7 +162,7 @@ class KafkaBrokerApp (trivup.App):
                                       deploy_exec)
         t_start = time.time()
         cmd = '%s %s "%s" "%s"' % \
-              (deploy_exec, self.get('version'), self.get('kafka_path', None), destdir)
+              (deploy_exec, self.get('version'), self.get('kafka_path', destdir), destdir)
         r = os.system(cmd)
         if r != 0:
             raise Exception('Deploy "%s" returned exit code %d' % (cmd, r))

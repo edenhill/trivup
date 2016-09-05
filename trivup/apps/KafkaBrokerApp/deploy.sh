@@ -26,25 +26,24 @@ LOGFILE=$(mktemp)
 echo "# $0 $* at $(date)" > $LOGFILE
 echo "# DEST_DIR=$DEST_DIR" >> $LOGFILE
 
-
-if [[ $VERSION == 'trunk' ]]; then
+function kafka_build {
     echo "### $0: Build from git repo $KAFKA_DIR"
 
     [[ -z "$CLEAN_BUILD" ]] && CLEAN_BUILD=n
 
-    export PATH=$PATH:$HOME/src/gradle-2.11/bin
-
     pushd $KAFKA_DIR >> $LOGFILE
-    git checkout gradlew gradlew.bat >> $LOGFILE
+    [[ $CLEAN_BUILD == y ]] && git checkout gradlew gradlew.bat >> $LOGFILE
 
     echo "### $0: Checking out $VERSION"
     git checkout $VERSION >> $LOGFILE
 
-    # refresh gradle and do clean before rebuilding
-    if [[ $CLEAN_BUILD == y ]]; then
+    if [[ $CLEAN_BUILD == y || ! -d .gradle ]]; then
 	echo "### $0: Running gradle"
 	gradle >> $LOGFILE
+    fi
 
+    # refresh gradle and do clean before rebuilding
+    if [[ $CLEAN_BUILD == y ]]; then
 	echo "### $0: Cleaning"
 	./gradlew clean >> $LOGFILE
     fi
@@ -59,6 +58,21 @@ if [[ $VERSION == 'trunk' ]]; then
     ln -sf "$KAFKA_DIR" "$DEST_DIR"
 
     echo "### $0: Deployed Kafka $VERSION to $DEST_DIR (symlink to $KAFKA_DIR)"
+}
+
+function kafka_git_clone {
+    echo "### $0: Git cloning kafka to $KAFKA_DIR"
+    git clone https://github.com/apache/kafka.git "$KAFKA_DIR"
+}
+
+
+if [[ $VERSION == 'trunk' ]]; then
+    if [[ ! -f "$KAFKA_DIR/README.md" ]]; then
+	# No Kafka sources, check them out.
+	kafka_git_clone
+    fi
+
+    kafka_build
 
 else
 
