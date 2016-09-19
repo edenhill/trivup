@@ -23,6 +23,7 @@ class KafkaBrokerApp (trivup.App):
                                SASL listeners will be added automatically.
                                KerberosKdcApp is required for GSSAPI.
            * sasl_users - CSV list of SASL PLAIN of user=pass for authenticating clients
+           * ssl_client_auth - ssl.client.auth broker property (def: required)
            * num_partitions - Topic auto-create partition count (3)
            * replication_Factor - Topic auto-create replication factor (1)
            * port_base - Low TCP port base to start allocating from (random)
@@ -115,7 +116,7 @@ class KafkaBrokerApp (trivup.App):
             conf_blob.append('ssl.truststore.type = JKS')
             conf_blob.append('ssl.truststore.location = %s' % truststore)
             conf_blob.append('ssl.truststore.password = %s' % ssl.conf.get('ssl_key_pass'))
-            conf_blob.append('ssl.client.auth = required')
+            conf_blob.append('ssl.client.auth = %s' % self.conf.get('ssl_client_auth', 'required'))
 
         # Kafka Configuration properties
         self.conf['log_dirs'] = self.create_dir('logs')
