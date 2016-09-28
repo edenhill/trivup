@@ -79,10 +79,18 @@ else
     if [[ ! -f "$DEST_DIR/bin/kafka-server-start.sh" ]]; then
 	# Download and install tarball
 	mkdir -p "$DEST_DIR"
-	URL="http://mirrors.sonic.net/apache/kafka/${VERSION}/kafka_2.10-${VERSION}.tgz"
-	echo "### $0: Downloading $VERSION from $URL"
-	curl -s "$URL" | (cd $DEST_DIR && tar xzf - --strip-components=1)
-	echo "### $0: Successfully installed $VERSION to $DEST_DIR"
+	TRY_URLS="http://mirrors.sonic.net/apache/kafka/${VERSION}/kafka_2.10-${VERSION}.tgz"
+	downloaded=0
+	for URL in $TRY_URLS; do
+	    echo "### $0: Downloading $VERSION from $URL"
+	    curl -L -s "$URL" | (cd $DEST_DIR && tar xzf - --strip-components=1) || continue
+	    echo "### $0: Successfully installed $VERSION to $DEST_DIR"
+	    downloaded=1
+	done
+	if [[ $downloaded == 0 ]]; then
+	   echo "# Download of $VERSION failed"
+	   exit 1
+	fi
     else
 	echo "# $VERSION already installed in $DEST_DIR" >> $LOGFILE
     fi

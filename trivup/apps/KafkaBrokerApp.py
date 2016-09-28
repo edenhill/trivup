@@ -67,6 +67,7 @@ class KafkaBrokerApp (trivup.App):
         self.conf['address'] = '%(nodename)s:%(port)d' % self.conf
         self.conf['listeners'] = ','.join(['%s://%s:%d' % (x[0], self.node.name, x[1]) for x in ports])
         self.conf['advertised.listeners'] = self.conf['listeners']
+        self.conf['auto_create_topics'] = self.conf.get('auto_create_topics', 'true')
         self.dbg('Listeners: %s' % self.conf['listeners'])
 
         if len(sasl_mechs) > 0:
