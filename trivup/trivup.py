@@ -395,7 +395,7 @@ class App (object):
             if force:
                 self.dbg('forcing termination')
                 os.killpg(os.getpgid(self.proc.pid), signal.SIGKILL)
-                self.proc.wait(1)
+                self.proc.wait()
             else:
                 self.log('process did not terminate in %ds' % timeout)
                 self.state = 'stale'
