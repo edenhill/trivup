@@ -128,14 +128,14 @@ class Allocator (object):
         super(Allocator, self).__init__()
         self.cluster = cluster
 
-    def next (self):
+    def next (self, app):
         appid = self.cluster.appid_next
         self.cluster.appid_next += 1
         return appid
 
 
 class TcpPortAllocator (Allocator):
-    def next (self, port_base=None):
+    def next (self, app, port_base=None):
         """ Let the kernel allocate a port number by opening a TCP socket,
             then closing it and return the port number.
             Linux tries to avoid returning the same port again, so this should
@@ -160,10 +160,10 @@ class TcpPortAllocator (Allocator):
                     port += 1
                     continue
                 raise
-            if self.cluster.tcp_ports.get(port, False):
+            if self.cluster.tcp_ports.get(port, None) is not None:
                 port += 1
                 continue
-            self.cluster.tcp_ports[port] = True
+            self.cluster.tcp_ports[port] = app
             return port
 
         raise Exception("Could not allocate port (port_base=%s) in 100 attempts" % port_base)
@@ -174,7 +174,7 @@ class UuidAllocator (Allocator):
     def _next (trunc=36):
         return str(uuid4())[:trunc]
 
-    def next (self, trunc=36):
+    def next (self, app, trunc=36):
         return self._next(trunc=trunc)
 
 
@@ -190,7 +190,7 @@ class Node (object):
 
 class App (object):
     def __init__(self, cluster, conf=None, on=None):
-        self.appid = Allocator(cluster).next()
+        self.appid = Allocator(cluster).next(self)
         self.name = self.__class__.__name__
         self.cluster = cluster
         self.autostart = True # Starts with cluster.start()

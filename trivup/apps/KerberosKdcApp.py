@@ -16,7 +16,7 @@ class KerberosKdcApp (trivup.App):
         """
         super(KerberosKdcApp, self).__init__(cluster, conf=conf, on=on)
 
-        self.conf['port'] = trivup.TcpPortAllocator(self.cluster).next()
+        self.conf['port'] = trivup.TcpPortAllocator(self.cluster).next(self)
         self.conf['realm'] = realm
         self.conf['address'] = '%(nodename)s:%(port)d' % self.conf
         self.conf['dbpath'] = self.mkpath('database')
