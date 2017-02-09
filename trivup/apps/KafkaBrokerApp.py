@@ -20,6 +20,7 @@ class KafkaBrokerApp (trivup.App):
                        will be downloaded and deployed.
            * listeners - CSV list of listener types: PLAINTEXT,SSL,SASL,SASL_SSL
            * listener_host - alternative listener host instead of node name (e.g., '*')
+           * advertised_hostname - hostname to use for advertised.hostname (defaults to 'on' node)
            * sasl_mechanisms - CSV list of SASL mechanisms to enable: GSSAPI,PLAIN
                                SASL listeners will be added automatically.
                                KerberosKdcApp is required for GSSAPI.
@@ -69,10 +70,12 @@ class KafkaBrokerApp (trivup.App):
         self.conf['port'] = ports[0][1] # "Default" port
         self.conf['address'] = '%s:%d' % (listener_host, self.conf['port'])
         self.conf['listeners'] = ','.join(['%s://%s:%d' % (x[0], listener_host, x[1]) for x in ports])
-        self.conf['advertised.listeners'] = self.conf['listeners']
+        if 'advertised_hostname' not in self.conf:
+            self.conf['advertised_hostname'] = self.conf['nodename']
+        self.conf['advertised.listeners'] =','.join(['%s://%s:%d' % (x[0], self.conf['advertised_hostname'], x[1]) for x in ports])
         self.conf['auto_create_topics'] = self.conf.get('auto_create_topics', 'true')
         self.dbg('Listeners: %s' % self.conf['listeners'])
-        self.dbg('Advertised Listeners: %s' % self.conf['advertised_listeners'])
+        self.dbg('Advertised Listeners: %s' % self.conf['advertised.listeners'])
 
         if len(sasl_mechs) > 0:
             self.dbg('SASL mechanisms: %s' % sasl_mechs)
@@ -100,7 +103,7 @@ class KafkaBrokerApp (trivup.App):
                 self.env_add('KRB5_CONFIG', kdc.conf['krb5_conf'])
                 self.env_add('KAFKA_OPTS', '-Djava.security.krb5.conf=%s' % kdc.conf['krb5_conf'])
                 self.env_add('KAFKA_OPTS', '-Dsun.security.krb5.debug=true')
-                self.kerberos_principal,self.kerberos_keytab = kdc.add_principal('kafka', listener_host)
+                self.kerberos_principal,self.kerberos_keytab = kdc.add_principal('kafka', self.conf['advertised_hostname'])
                 jaas_blob.append('com.sun.security.auth.module.Krb5LoginModule required')
                 jaas_blob.append('useKeyTab=true storeKey=true doNotPrompt=true')
                 jaas_blob.append('keyTab="%s"' % self.kerberos_keytab)
