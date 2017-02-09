@@ -79,12 +79,16 @@ class KafkaBrokerApp (trivup.App):
             jaas_blob.append('KafkaServer {')
 
             conf_blob.append('sasl.enabled.mechanisms=%s' % ','.join(sasl_mechs))
-            if 'PLAIN' in sasl_mechs:
+            if 'PLAIN' in sasl_mechs or 'SCRAM-SHA-1' in sasl_mechs:
+                if 'PLAIN' in sasl_mechs:
+                    plugin = 'Plain'
+                else:
+                    plugin = 'Scram'
                 sasl_users = self.conf.get('sasl_users', '')
                 if len(sasl_users) == 0:
-                    self.log('WARNING: No sasl_users configured for PLAIN, expected CSV of user=pass,..')
+                    self.log('WARNING: No sasl_users configured for %s, expected CSV of user=pass,..' % plugin)
                 else:
-                    jaas_blob.append('org.apache.kafka.common.security.plain.PlainLoginModule required debug=true')
+                    jaas_blob.append('org.apache.kafka.common.security.plain.%sLoginModule required debug=true' % plugin)
                     for up in sasl_users.split(','):
                         u,p = up.split('=')
                         jaas_blob.append('user_%s="%s"' % (u, p))
