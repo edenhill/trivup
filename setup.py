@@ -14,7 +14,7 @@ print(data)
 print(find_packages())
 
 setup(name='trivup',
-      version='0.1',
+      version='0.2',
       description='Trivially Up a cluster of programs',
       author='Magnus Edenhill',
       author_email='magnus@edenhill.se',
