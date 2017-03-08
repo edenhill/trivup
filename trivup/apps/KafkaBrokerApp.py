@@ -20,7 +20,7 @@ class KafkaBrokerApp (trivup.App):
                        will be downloaded and deployed.
            * listeners - CSV list of listener types: PLAINTEXT,SSL,SASL,SASL_SSL
            * listener_host - alternative listener host instead of node name (e.g., '*')
-           * advertised_hostname - hostname to use for advertised.hostname (defaults to 'on' node)
+           * advertised_hostname - hostname to use for advertised.listeners (defaults to 'on' node)
            * sasl_mechanisms - CSV list of SASL mechanisms to enable: GSSAPI,PLAIN
                                SASL listeners will be added automatically.
                                KerberosKdcApp is required for GSSAPI.
