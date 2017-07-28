@@ -2,6 +2,7 @@ from trivup import trivup
 from trivup.apps.KerberosKdcApp import KerberosKdcApp
 
 import os
+import socket
 import time
 
 
@@ -162,8 +163,8 @@ class KafkaBrokerApp (trivup.App):
 
     def operational (self):
         self.dbg('Checking if operational')
-        return os.system('(echo anything | nc %s) 2>/dev/null' %
-                         ' '.join(self.get('address').split(':'))) == 0
+        addr, port = self.get('address').split(':')
+        return socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect_ex((addr, int(port))) == 0
 
 
     def deploy (self):
