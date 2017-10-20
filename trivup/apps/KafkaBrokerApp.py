@@ -45,6 +45,23 @@ class KafkaBrokerApp (trivup.App):
             self.conf['version'] = 'trunk'
 
         listener_host = self.conf.get('listener_host', self.conf.get('nodename'))
+        # Kafka Configuration properties
+        self.conf['log_dirs'] = self.create_dir('logs')
+        if 'num_partitions' not in self.conf:
+            self.conf['num_partitions'] = 3
+        self.conf['zk_connect'] = self.zk.get('address', None)
+        if 'replication_factor' not in self.conf:
+            self.conf['replication_factor'] = 1
+
+        # Kafka paths
+        if self.conf.get('kafka_path', None) is not None:
+            self.conf['destdir'] = self.conf['kafka_path']
+            self.conf['bindir'] = os.path.join(self.conf['destdir'], 'bin')
+            start_sh = os.path.join(self.conf['bindir'], 'kafka-server-start.sh')
+            kafka_configs_sh = os.path.join(self.conf['bindir'], 'kafka-configs.sh')
+        else:
+            start_sh = 'kafka-server-start.sh'
+            kafka_configs_sh = 'kafka-configs.sh'
 
         # Arbitrary (non-template) configuration statements
         conf_blob = self.conf.get('conf', list())
@@ -143,13 +160,6 @@ class KafkaBrokerApp (trivup.App):
             conf_blob.append('ssl.truststore.password = %s' % ssl.conf.get('ssl_key_pass'))
             conf_blob.append('ssl.client.auth = %s' % self.conf.get('ssl_client_auth', 'required'))
 
-        # Kafka Configuration properties
-        self.conf['log_dirs'] = self.create_dir('logs')
-        if 'num_partitions' not in self.conf:
-            self.conf['num_partitions'] = 3
-        self.conf['zk_connect'] = self.zk.get('address', None)
-        if 'replication_factor' not in self.conf:
-            self.conf['replication_factor'] = 1
 
         # Generate config file
         self.conf['conf_file'] = self.create_file_from_template('server.properties',
@@ -163,12 +173,6 @@ class KafkaBrokerApp (trivup.App):
 
         # Runs in foreground, stopped by Ctrl-C
         # This is the default for no-deploy use: will be overwritten by deploy() if enabled.
-        if self.conf.get('kafka_path', None) is not None:
-            self.conf['destdir'] = self.conf['kafka_path']
-            self.conf['bindir'] = os.path.join(self.conf['destdir'], 'bin')
-            start_sh = os.path.join(self.conf['bindir'], 'kafka-server-start.sh')
-        else:
-            start_sh = 'kafka-server-start.sh'
 
         self.conf['start_cmd'] = '%s %s' % (start_sh, self.conf['conf_file'])
         self.conf['stop_cmd'] = None # Ctrl-C
