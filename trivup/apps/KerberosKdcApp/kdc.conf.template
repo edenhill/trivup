@@ -4,6 +4,7 @@
         admin_keytab = FILE:${admin_keytab}
         key_stash_file = ${stash_file}
         kdc_ports = ${port}
+        kdc_tcp_ports = ${port}
         max_life = 10h 0m 0s
         max_renewable_life = 7d 0h 0m 0s
         master_key_type = des3-hmac-sha1
