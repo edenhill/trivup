@@ -90,6 +90,14 @@ class Cluster (object):
         for app in reversed(self.apps):
             app.cleanup(keeptypes=keeptypes)
 
+    def run_post_cmds (self):
+        """
+        Run any registered post_start_cmds for all apps.
+        Should only be called once when the cluster goes fully operational.
+        """
+        for app in self.apps:
+            app.run_post_cmds()
+
     def wait_operational (self, timeout=30):
         """ Wait for all started apps in the cluster to become operational """
         t_end = time.time() + timeout
@@ -101,6 +109,8 @@ class Cluster (object):
                     self.log('%d apps terminated while waiting to go operational: %s' % \
                           (len(stopped), ', '.join([str(x) for x in stopped])))
                     return False
+                # Run post_start_cmds for all apps
+                self.run_post_cmds()
                 return True
             self.dbg('Waiting for %d apps to go operational: %s' %
                      (len(not_oper), ', '.join([str(x) for x in not_oper])))
@@ -201,6 +211,8 @@ class App (object):
         # List {'type': .., 'path': ..} tuples of created paths, for cleanup
         self.paths = list()
         self.debug = cluster.debug
+        # Post-startup commands
+        self.post_start_cmds = list()
 
         self.t_started = 0
         self.t_stopped = 0
@@ -366,7 +378,23 @@ class App (object):
                                  stderr_fd=self.stderr_fd)
 
 
-        
+    def run_post_cmds (self):
+        """
+        Run any registers post_start_cmds.
+        Should only be called once when the cluster is operational.
+        """
+        self.dbg('Running %d post_start_cmds' % len(self.post_start_cmds))
+        for cmd in self.post_start_cmds:
+            try:
+                output = subprocess.check_output(cmd, env=dict(os.environ, **self.env), shell=True)
+                self.dbg('%s returned: %s' % (cmd, output))
+            except subprocess.CalledProcessError as e:
+                self.log('Failed to run %s' % (cmd))
+                raise e
+
+        # Avoid re-run
+        self.post_start_cmds = list()
+
     def start (self):
         if self.state == 'started':
             raise Exception('%s already started' % self.name)
@@ -445,6 +473,7 @@ class App (object):
             if self.status() == 'stopped':
                 return False
             if self.operational():
+                self.run_post_cmds()
                 return True
             time.sleep(1.0)
         return False
