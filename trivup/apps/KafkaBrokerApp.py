@@ -23,10 +23,10 @@ class KafkaBrokerApp (trivup.App):
            * listeners - CSV list of listener types: PLAINTEXT,SSL,SASL,SASL_SSL
            * listener_host - alternative listener host instead of node name (e.g., '*')
            * advertised_hostname - hostname to use for advertised.listeners (defaults to 'on' node)
-           * sasl_mechanisms - CSV list of SASL mechanisms to enable: GSSAPI,PLAIN
+           * sasl_mechanisms - CSV list of SASL mechanisms to enable: GSSAPI,PLAIN,SCRAM-SHA-n
                                SASL listeners will be added automatically.
                                KerberosKdcApp is required for GSSAPI.
-           * sasl_users - CSV list of SASL PLAIN of user=pass for authenticating clients
+           * sasl_users - CSV list of SASL PLAIN/SCRAM of user=pass for authenticating clients
            * ssl_client_auth - ssl.client.auth broker property (def: required)
            * num_partitions - Topic auto-create partition count (3)
            * replication_Factor - Topic auto-create replication factor (1)
@@ -84,19 +84,30 @@ class KafkaBrokerApp (trivup.App):
             jaas_blob.append('KafkaServer {')
 
             conf_blob.append('sasl.enabled.mechanisms=%s' % ','.join(sasl_mechs))
-            if 'PLAIN' in sasl_mechs or 'SCRAM-SHA-1' in sasl_mechs:
-                if 'PLAIN' in sasl_mechs:
-                    plugin = 'Plain'
+            # Handle PLAIN and SCRAM-.. the same way
+            for mech in sasl_mechs:
+                if mech.find('SCRAM') != -1:
+                    plugin = 'scram.Scram'
+                elif mech == 'PLAIN':
+                    plugin = 'plain.Plain'
                 else:
-                    plugin = 'Scram'
+                    continue
+
                 sasl_users = self.conf.get('sasl_users', '')
                 if len(sasl_users) == 0:
                     self.log('WARNING: No sasl_users configured for %s, expected CSV of user=pass,..' % plugin)
                 else:
-                    jaas_blob.append('org.apache.kafka.common.security.plain.%sLoginModule required debug=true' % plugin)
+                    jaas_blob.append('org.apache.kafka.common.security.%sLoginModule required debug=true' % plugin)
                     for up in sasl_users.split(','):
                         u,p = up.split('=')
-                        jaas_blob.append('user_%s="%s"' % (u, p))
+                        if plugin is 'plain.Plain':
+                            jaas_blob.append('  user_%s="%s"' % (u, p))
+                        elif plugin is 'scram.Scram':
+                            jaas_blob.append('  username="%s" password="%s"' % (u, p))
+                            # SCRAM users are set up in ZK with kafka-configs.sh
+                            self.post_start_cmds.append('%s --zookeeper %s --alter --add-config \'%s=[iterations=4096,password=%s]\' --entity-type users --entity-name \'%s\'' % \
+                                                        (kafka_configs_sh, self.conf['zk_connect'], mech, p, u))
+
                     jaas_blob[-1] += ';'
 
             if 'GSSAPI' in sasl_mechs:
