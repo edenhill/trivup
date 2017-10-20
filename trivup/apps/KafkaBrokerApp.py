@@ -205,3 +205,6 @@ class KafkaBrokerApp (trivup.App):
         # Override start command with updated path.
         self.conf['start_cmd'] = '%s/bin/kafka-server-start.sh %s' % (destdir, self.conf['conf_file'])
         self.dbg('Updated start_cmd to %s' % self.conf['start_cmd'])
+        # Add kafka-dir/bin to PATH so that the bundled tools are
+        # easily called.
+        self.env_add('PATH', os.environ.get('PATH') + ':' + os.path.join(destdir, 'bin'), append=False)
