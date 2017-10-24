@@ -180,7 +180,7 @@ class KafkaBrokerApp (trivup.App):
     def operational (self):
         self.dbg('Checking if operational')
         addr, port = self.get('address').split(':')
-        with contextlib.closing(socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+        with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
             return s.connect_ex((addr, int(port))) == 0
 
     def deploy (self):
