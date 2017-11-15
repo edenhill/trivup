@@ -405,6 +405,11 @@ class App (object):
         self.state = 'started'
         self.t_started = time.time()
 
+    def pid (self):
+        if self.proc is None:
+            return 0
+        return self.proc.pid
+
     def wait_stopped (self, timeout=30, force=False):
         """
         Wait for process to terminate.
@@ -438,7 +443,11 @@ class App (object):
             return
 
         self.dbg('Stopping')
-        os.killpg(os.getpgid(self.proc.pid), signal.SIGTERM)
+        try:
+            os.killpg(os.getpgid(self.proc.pid), signal.SIGTERM)
+        except OSError as e:
+            self.log('killpg() failed: already dead? (%s): ignoring' % str(e))
+            wait_term = False
 
         if wait_term:
             # Wait for termination
@@ -447,7 +456,7 @@ class App (object):
             self.state = 'stopped'
 
         self.dbg('now %s, runtime %ds' % (self.state, self.runtime()))
-        
+
         self.stdout_fd.close()
         self.stderr_fd.close()
         self.proc = None
