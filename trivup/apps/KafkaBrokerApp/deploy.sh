@@ -80,7 +80,7 @@ else
 	# Download and install tarball
 	mkdir -p "$DEST_DIR"
 	if [[ -z "$KAFKA_URL" ]]; then
-	    KAFKA_URL="http://mirrors.sonic.net/apache/kafka/${VERSION}/kafka_2.10-${VERSION}.tgz"
+	    KAFKA_URL="http://apache.mirrors.spacedump.net/kafka/${VERSION}/kafka_2.11-${VERSION}.tgz"
 	fi
 	TRY_URLS="$KAFKA_URL"
 	downloaded=0
