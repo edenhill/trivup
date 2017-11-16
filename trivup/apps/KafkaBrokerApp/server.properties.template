@@ -11,4 +11,5 @@ zookeeper.connect=${zk_connect}
 auto.create.topics.enable=${auto_create_topics}
 delete.topic.enable=true
 default.replication.factor=${replication_factor}
+offsets.topic.replication.factor=${replication_factor}
 security.inter.broker.protocol=PLAINTEXT
