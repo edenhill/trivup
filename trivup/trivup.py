@@ -349,6 +349,11 @@ class App (object):
         """
         cmd = self.node.exec_cmd + cmd
         self.dbg('Executing: %s' % cmd)
+        self.dbg('Environment: %s' % str(self.env))
+        fdlimit = self.conf.get('fdlimit', 0)
+        self.dbg('FD limit: %d' % fdlimit)
+        if fdlimit > 0:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (fdlimit, fdlimit))
 
         to_close = list()
         if type(stdout_fd) == str:
@@ -370,7 +375,6 @@ class App (object):
 
     def run (self):
         """ Run application using conf \p start_cmd """
-        self.dbg('Environment: %s' % str(self.env))
         self.stdout_fd = open(self.mkpath('stdout.log', 'log'), 'a')
         self.stderr_fd = open(self.mkpath('stderr.log', 'log'), 'a')
         self.proc = self.execute(self.start_cmd(),

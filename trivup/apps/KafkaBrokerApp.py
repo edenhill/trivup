@@ -32,6 +32,7 @@ class KafkaBrokerApp (trivup.App):
            * replication_Factor - Topic auto-create replication factor (1)
            * port_base - Low TCP port base to start allocating from (random)
            * kafka_path - Path to Kafka build tree (for trunk usage)
+           * fdlimit - RLIMIT_NOFILE (default: system)
            * conf - arbitary server.properties config as a list of strings.
         """
         super(KafkaBrokerApp, self).__init__(cluster, conf=conf, on=on)
@@ -43,6 +44,9 @@ class KafkaBrokerApp (trivup.App):
         # Kafka repo uses SVN nomenclature
         if self.conf['version'] == 'master':
             self.conf['version'] = 'trunk'
+
+        if 'fdlimit' not in self.conf:
+            self.conf.set('fdlimit', 50000)
 
         listener_host = self.conf.get('listener_host', self.conf.get('nodename'))
         # Kafka Configuration properties
