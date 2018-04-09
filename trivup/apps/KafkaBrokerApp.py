@@ -175,6 +175,8 @@ class KafkaBrokerApp (trivup.App):
             self.conf['log4j_file'] = self.create_file_from_template('log4j.properties', self.conf, subst=False)
             self.env_add('KAFKA_LOG4J_OPTS', '-Dlog4j.configuration=file:%s' % self.conf['log4j_file'])
 
+        self.env_add('LOG_DIR', self.mkpath('debug'))
+
         # Runs in foreground, stopped by Ctrl-C
         # This is the default for no-deploy use: will be overwritten by deploy() if enabled.
 
