@@ -13,6 +13,8 @@ import pkgutil
 import pkg_resources
 import random
 import socket
+import resource
+
 
 class Cluster (object):
     def __init__(self, name, root_path, nodes=['localhost'], debug=False):
@@ -353,7 +355,10 @@ class App (object):
         fdlimit = self.conf.get('fdlimit', 0)
         self.dbg('FD limit: %d' % fdlimit)
         if fdlimit > 0:
-            resource.setrlimit(resource.RLIMIT_NOFILE, (fdlimit, fdlimit))
+            try:
+                resource.setrlimit(resource.RLIMIT_NOFILE, (fdlimit, fdlimit))
+            except ValueError, e:
+                self.log('Failed to set RLIMIT_NOFILE({},{}): {}'.format(fdlimit , fdlimit, e))
 
         to_close = list()
         if type(stdout_fd) == str:

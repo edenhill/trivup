@@ -46,7 +46,7 @@ class KafkaBrokerApp (trivup.App):
             self.conf['version'] = 'trunk'
 
         if 'fdlimit' not in self.conf:
-            self.conf.set('fdlimit', 50000)
+            self.conf['fdlimit'] = 50000
 
         listener_host = self.conf.get('listener_host', self.conf.get('nodename'))
         # Kafka Configuration properties
