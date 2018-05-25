@@ -10,9 +10,6 @@ data[app] = list()
 for d in glob('trivup/apps/*App'):
     data[app] += [x[x.find('apps/'):] for x in glob('%s/*' % d) if x[-1:] != '~']
 
-print(data)
-print(find_packages())
-
 setup(name='trivup',
       version='0.2',
       description='Trivially Up a cluster of programs',
