@@ -11,8 +11,8 @@ for d in glob('trivup/apps/*App'):
     data[app] += [x[x.find('apps/'):] for x in glob('%s/*' % d) if x[-1:] != '~']
 
 setup(name='trivup',
-      version='0.2',
-      description='Trivially Up a cluster of programs',
+      version='0.3',
+      description='Trivially Up a cluster of programs, such as a Kafka cluster',
       author='Magnus Edenhill',
       author_email='magnus@edenhill.se',
       url='https://github.com/edenhill/trivup',
