@@ -14,6 +14,7 @@ import pkg_resources
 import random
 import socket
 import resource
+import datetime
 
 
 class Cluster (object):
@@ -35,7 +36,7 @@ class Cluster (object):
         self.tcp_ports = dict()
 
     def log (self, msg):
-        print('%s: %s' % (self.name, msg))
+        print('[%s] %s: %s' % (datetime.datetime.now(), self.name, msg))
 
     def dbg (self, msg):
         if self.debug:
@@ -238,7 +239,7 @@ class App (object):
 
         if 'version' not in self.conf:
             self.conf['version'] = 'master'
-       
+
         # Runtime root path (runtime created files)
         self._root_path = os.path.join(cluster.root_path, cluster.instance,
                                        self.name)
@@ -248,10 +249,9 @@ class App (object):
 
         self.state = 'init'
         self.dbg('Creating %s instance' % self.name)
-        
 
     def log (self, msg):
-        print('%s-%s: %s' % (self.name, self.appid, msg))
+        print('[%s] %s-%s: %s' % (datetime.datetime.now(), self.name, self.appid, msg))
 
     def dbg (self, msg):
         if self.debug:
@@ -278,7 +278,7 @@ class App (object):
         return path
 
     def create_dir (self, relpath, unique=False):
-        path = self.mkpath(relpath, unique)
+        path = self.mkpath(relpath, unique=unique)
         if not os.path.exists(path):
             os.makedirs(path)
         return path
@@ -380,8 +380,8 @@ class App (object):
 
     def run (self):
         """ Run application using conf \p start_cmd """
-        self.stdout_fd = open(self.mkpath('stdout.log', 'log'), 'a')
-        self.stderr_fd = open(self.mkpath('stderr.log', 'log'), 'a')
+        self.stdout_fd = open(self.mkpath('stdout.log', pathtype='log'), 'a')
+        self.stderr_fd = open(self.mkpath('stderr.log', pathtype='log'), 'a')
         self.proc = self.execute(self.start_cmd(),
                                  stdout_fd=self.stdout_fd,
                                  stderr_fd=self.stderr_fd)
@@ -511,9 +511,9 @@ class App (object):
             path = p['path']
             if not os.path.exists(path):
                 continue
+            self.dbg('Cleanup: %s (type %s, %s)' % (path, p['type'], p))
             if keeptypes is not None and p['type'] in keeptypes:
                 continue
-            self.dbg('Cleanup: %s' % path)
             try:
                 if os.path.isdir(path):
                     shutil.rmtree(path)
