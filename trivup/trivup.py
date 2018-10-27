@@ -352,7 +352,15 @@ class App (object):
         cmd = self.node.exec_cmd + cmd
         self.dbg('Executing: %s' % cmd)
         self.dbg('Environment: %s' % str(self.env))
+
         fdlimit = self.conf.get('fdlimit', 0)
+        if fdlimit == 'max':
+            try:
+                soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+                fdlimit = hard
+            except Exception, e:
+                self.log('Failed to get RLIMIT_NOFILE: {}: using system default'.format(e))
+                fdlimit = 0
         self.dbg('FD limit: %d' % fdlimit)
         if fdlimit > 0:
             try:
