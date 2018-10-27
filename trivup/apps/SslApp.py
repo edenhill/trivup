@@ -86,7 +86,7 @@ class SslApp (trivup.App):
 yes""" % d
 
         self.dbg('Generating key for %s: %s' % (cn, keystore))
-        self.exec_cmd('keytool -storepass "%s" -keypass "%s" -keystore "%s" -alias localhost -validity 10000 -genkey <<EOF\n%s\nEOF' % \
+        self.exec_cmd('keytool -keyalg RSA -storepass "%s" -keypass "%s" -keystore "%s" -alias localhost -validity 10000 -genkey <<EOF\n%s\nEOF' % \
                       (self.conf.get('ssl_key_pass'),
                        self.conf.get('ssl_key_pass'),
                        keystore, inblob))
