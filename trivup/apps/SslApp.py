@@ -13,11 +13,11 @@ class SslApp (trivup.App):
         @param cluster     Current cluster
         @param conf        Configuration dict, see below.
         @param on          Node name to run on
-        
+
         Honoured \p conf properties:
          * ssl_key_pass - SSL keytab password (default: 12345678)
          * SSL_{OU,O,L,S,ST,C} - (defaults: NN)
-        
+
         """
         super(SslApp, self).__init__(cluster, conf=conf, on=on)
 
@@ -55,7 +55,7 @@ class SslApp (trivup.App):
         cert = self.mkpath('ca_%s.cert' % cn)
         srl = self.mkpath('ca_%s.srl' % cn)
 
-        self.exec_cmd('openssl req -new -x509 -keyout "%s" -out "%s" -days 10000 -passin "pass:%s" -passout "pass:%s" -subj "%s"' % 
+        self.exec_cmd('openssl req -new -x509 -keyout "%s" -out "%s" -days 10000 -passin "pass:%s" -passout "pass:%s" -subj "%s"' %
                       (key, cert,
                        self.conf.get('ssl_key_pass'),
                        self.conf.get('ssl_key_pass'),
@@ -67,7 +67,6 @@ class SslApp (trivup.App):
         """
         Create signed Java keystore for \p cn
         @returns (keystore, truststore, cert, signedcert)
-                 
         """
         keystore = self.mkpath('%s.keystore.jks' % cn)
         truststore = self.mkpath('%s.truststore.jks' % cn)
