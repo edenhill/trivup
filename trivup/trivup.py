@@ -101,6 +101,18 @@ class Cluster (object):
         for app in self.apps:
             app.run_post_cmds()
 
+    def wait_stopped (self, timeout=30):
+        """ Wait for all apps to stop """
+        t_end = time.time() + timeout
+        while time.time() < t_end:
+            not_stopped = [x for x in self.apps if x.status() != 'stopped']
+            if len(not_stopped) == 0:
+                return True
+            self.dbg('Waiting for %d apps to stop: %s' %
+                     (len(not_stopped), ', '.join([str(x) for x in not_stopped])))
+            time.sleep(1)
+        return False
+
     def wait_operational (self, timeout=30):
         """ Wait for all started apps in the cluster to become operational """
         t_end = time.time() + timeout
@@ -437,10 +449,14 @@ class App (object):
         @returns True on succesful termination, else False.
         """
         t_end = time.time() + timeout
-        while time.time() < t_end and self.proc.poll() is None:
+        while time.time() < t_end and \
+              (self.proc.poll() is None or self.proc.returncode is None):
             time.sleep(0.5)
 
-        if self.proc.poll() is None:
+        r = self.proc.wait()
+        self.dbg("wait {} returned {}, wait_stopped returncode {}".format(self.proc.pid, r, self.proc.returncode))
+
+        if self.proc.returncode is None:
             self.dbg('still alive')
             if force:
                 self.dbg('forcing termination')
@@ -459,7 +475,7 @@ class App (object):
         if self.state != 'started':
             return
 
-        self.dbg('Stopping')
+        self.dbg('Stopping (pid {})'.format(self.proc.pid))
         try:
             os.killpg(os.getpgid(self.proc.pid), signal.SIGTERM)
         except OSError as e:
