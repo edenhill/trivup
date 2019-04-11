@@ -23,7 +23,7 @@ class KafkaBrokerApp (trivup.App):
            * listeners - CSV list of listener types: PLAINTEXT,SSL,SASL,SASL_SSL
            * listener_host - alternative listener host instead of node name (e.g., '*')
            * advertised_hostname - hostname to use for advertised.listeners (defaults to 'on' node)
-           * sasl_mechanisms - CSV list of SASL mechanisms to enable: GSSAPI,PLAIN,SCRAM-SHA-n
+           * sasl_mechanisms - CSV list of SASL mechanisms to enable: GSSAPI,PLAIN,SCRAM-SHA-n,OAUTHBEARER
                                SASL listeners will be added automatically.
                                KerberosKdcApp is required for GSSAPI.
            * sasl_users - CSV list of SASL PLAIN/SCRAM of user=pass for authenticating clients
@@ -143,6 +143,20 @@ class KafkaBrokerApp (trivup.App):
                 jaas_blob.append('keyTab="%s"' % self.kerberos_keytab)
                 jaas_blob.append('debug=true')
                 jaas_blob.append('principal="%s";' % self.kerberos_principal)
+
+            if 'OAUTHBEARER' in sasl_mechs:
+                # Use the unsecure JSON web token.
+                # Client should be configured with
+                # 'sasl.oauthbearer.config=scope=requiredScope principal=admin'
+                # Change requiredScope to something else to trigger auth error.
+                conf_blob.append('super.users=User:admin')
+                conf_blob.append('allow.everyone.if.no.acl.found=true')
+                conf_blob.append('authorizer.class.name=kafka.security.auth.SimpleAclAuthorizer')
+                jaas_blob.append('org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required')
+                jaas_blob.append('  unsecuredLoginLifetimeSeconds="3600"')
+                jaas_blob.append('  unsecuredLoginStringClaim_sub="admin"')
+                jaas_blob.append('  unsecuredValidatorRequiredScope="requiredScope"')
+                jaas_blob.append(';')
 
             jaas_blob.append('};\n')
             self.conf['jaas_file'] = self.create_file('jaas_broker.conf', data='\n'.join(jaas_blob))
