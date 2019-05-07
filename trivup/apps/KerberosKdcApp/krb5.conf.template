@@ -1,11 +1,29 @@
 [libdefaults]
-	default_realm = ${realm}
-	rdns = false
-	dns_canonicalize_hostname = false
-	dns_lookup_kdc = false
+default_realm = ${realm}
+rdns = false
+dns_canonicalize_hostname = false
+dns_lookup_kdc = false
+dns_lookup_realm = false
+forwardable = true
+renew_lifetime = ${renew_lifetime}
+ticket_lifetime = ${ticket_lifetime}
 
 [realms]
-	${realm} = {
-		kdc = ${nodename}:${port}
-		admin_server = ${nodename}
-	}
+${realm} = {
+ kdc = ${nodename}:${port}
+ admin_server = ${nodename}:${port}
+}
+${cross_realms}
+
+[capaths]
+${capaths}
+
+# FIXME: cross-realm thing, nodename should map to the broker's realm.
+[domain_realm]
+ ${nodename} = ${default_realm}
+ .${nodename} = ${default_realm}
+
+[logging]
+ kdc = STDERR
+ admin_server = STDERR
+ default = STDERR

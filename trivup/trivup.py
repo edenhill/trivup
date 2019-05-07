@@ -55,14 +55,23 @@ class Cluster (object):
         self.apps.append(app)
 
 
-    def find_app (self, appclass):
-        """ Return an app instance matching appclass (string or type) """
+    def find_app (self, appclass, by_conf=None):
+        """ Return an app instance matching appclass (string or type).
+            If by_conf is set to a (name,value) tuple, the application's
+            config property 'name' must have the value of 'value'.
+        """
         for app in self.apps:
             if type(appclass) == str:
-                if app.__class__.__name__ == appclass:
-                    return app
-            elif isinstance(app, appclass):
-                return app
+                if app.__class__.__name__ != appclass:
+                    continue
+            elif not isinstance(app, appclass):
+                continue
+
+            if by_conf is not None:
+                if app.conf.get(by_conf[0], None) != by_conf[1]:
+                    continue
+            return app
+
         return None
 
     def deploy (self):

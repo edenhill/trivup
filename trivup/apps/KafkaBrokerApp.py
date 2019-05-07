@@ -34,6 +34,7 @@ class KafkaBrokerApp (trivup.App):
            * kafka_path - Path to Kafka build tree (for trunk usage)
            * fdlimit - RLIMIT_NOFILE (or "max") (default: max)
            * conf - arbitary server.properties config as a list of strings.
+           * realm - Kerberos realm to use when sasl_mechanisms contains GSSAPI.
         """
         super(KafkaBrokerApp, self).__init__(cluster, conf=conf, on=on)
 
@@ -133,7 +134,23 @@ class KafkaBrokerApp (trivup.App):
 
             if 'GSSAPI' in sasl_mechs:
                 conf_blob.append('sasl.kerberos.service.name=%s' % 'kafka')
-                kdc = self.cluster.find_app(KerberosKdcApp)
+                realm = self.conf.get('realm', None)
+                if realm is None:
+                    kdc = self.cluster.find_app(KerberosKdcApp)
+                    self.conf['realm'] = kdc.conf.get('realm', None)
+                else:
+                    kdc = self.cluster.find_app(KerberosKdcApp, ('realm', realm))
+                    # If a realm was specified it is most likely because
+                    # we're operating in a cross-realm scenario.
+                    # Add a principal mapping client principals without
+                    # hostname ("admin" rather than "admin/localhost")
+                    # to a local user.
+                    # This is not compatible with "admin/localhost" principals.
+                    conf_blob.append('authorizer.class.name=kafka.security.auth.SimpleAclAuthorizer')
+                    conf_blob.append('allow.everyone.if.no.acl.found=true')
+                    conf_blob.append('sasl.kerberos.principal.to.local.rules=RULE:[1:admin](.*)s/^.*/admin/')
+
+                assert kdc is not None, "No KerberosKdcApp found (realm={})".format(realm)
                 self.env_add('KRB5_CONFIG', kdc.conf['krb5_conf'])
                 self.env_add('KAFKA_OPTS', '-Djava.security.krb5.conf=%s' % kdc.conf['krb5_conf'])
                 self.env_add('KAFKA_OPTS', '-Dsun.security.krb5.debug=true')
