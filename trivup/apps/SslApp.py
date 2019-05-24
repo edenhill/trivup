@@ -31,7 +31,7 @@ class SslApp (trivup.App):
         self.conf.setdefault('ssl_user', os.getenv('USER', 'NN'))
 
         # Generate a CA cert
-        self.ca_key, self.ca_cert, self.ca_srl = self.create_ca_cert(self.__class__.__name__)
+        self.ca = self.create_ca_cert(self.__class__.__name__)
 
 
     def exec_cmd (self, cmd):
@@ -49,19 +49,24 @@ class SslApp (trivup.App):
     def create_ca_cert (self, cn):
         """
         Create CA cert
-        @returns (key_file, cert_file, srl_file)
+        @returns {'pem': .., 'der': .., 'key': .., 'srl': .., 'password': ..}
         """
-        key = self.mkpath('ca_%s.key' % cn)
-        cert = self.mkpath('ca_%s.cert' % cn)
-        srl = self.mkpath('ca_%s.srl' % cn)
+        ret = {'key': self.mkpath('ca_%s.key' % cn),
+               'srl': self.mkpath('ca_%s.srl' % cn),
+               'pem': self.mkpath('ca_%s.pem' % cn),
+               'der': self.mkpath('ca_%s.der' % cn),
+               'password': self.conf.get('ssl_key_pass')}
 
+        self.dbg('Generating CA cert for %s in %s' % (cn, ret['pem']))
         self.exec_cmd('openssl req -new -x509 -keyout "%s" -out "%s" -days 10000 -passin "pass:%s" -passout "pass:%s" -subj "%s"' %
-                      (key, cert,
-                       self.conf.get('ssl_key_pass'),
-                       self.conf.get('ssl_key_pass'),
+                      (ret['key'], ret['pem'],
+                       ret['password'], ret['password'],
                        self.mksubj(cn)))
-        return (key, cert, srl)
 
+        self.dbg('Convert CA PEM to DER')
+        self.exec_cmd('openssl x509 -outform der -in "%s" -out "%s"' % \
+                      (ret['pem'], ret['der']))
+        return ret
 
     def create_keystore (self, cn):
         """
@@ -94,7 +99,7 @@ yes""" % d
         self.exec_cmd('keytool -storepass "%s" -keypass "%s" -keystore "%s" -alias CARoot -import -file "%s" <<EOF\nyes\nEOF' % \
                       (self.conf.get('ssl_key_pass'),
                        self.conf.get('ssl_key_pass'),
-                       truststore, self.ca_cert))
+                       truststore, self.ca['pem']))
 
         self.dbg('Export certificate for %s: %s' % (cn, cert))
         self.exec_cmd('keytool -storepass "%s" -keypass "%s" -keystore "%s" -alias localhost -certreq -file "%s"' % \
@@ -104,7 +109,7 @@ yes""" % d
 
         self.dbg('Sign certificate for %s' % cn)
         self.exec_cmd('openssl x509 -req -CA "%s" -CAkey "%s" -in "%s" -out "%s" -days 10000 -CAcreateserial -passin "pass:%s"' % \
-                      (self.ca_cert, self.ca_key,
+                      (self.ca['pem'], self.ca['key'],
                        cert, signedcert,
                        self.conf.get('ssl_key_pass')))
 
@@ -113,8 +118,8 @@ yes""" % d
         self.exec_cmd('keytool -storepass "%s" -keypass "%s" -keystore "%s" -alias CARoot -import -file "%s" <<EOF\nyes\nEOF' % \
                       (self.conf.get('ssl_key_pass'),
                        self.conf.get('ssl_key_pass'),
-                       keystore, self.ca_cert))
-        
+                       keystore, self.ca['pem']))
+
         self.dbg('Import signed CA for %s' % cn)
         self.exec_cmd('keytool -storepass "%s" -keypass "%s" -keystore "%s" -alias localhost -import -file "%s"' % \
                       (self.conf.get('ssl_key_pass'),
@@ -123,36 +128,63 @@ yes""" % d
 
         return (keystore, truststore, cert, signedcert)
 
-    
-
-    def create_key (self, cn):
+    def create_cert (self, cn):
         """
-        Create standard PEM keys for \p cn.
-        This is typically for clients.
-        @returns (key, req, pem)
+        Create certificate/keys, in multiple formats (PEM, DER, PKCS#12),
+        for \p cn.
+        This is typically used for clients.
+        The PKCS contains private key, public key, and CA cert
+        @returns {'priv': {'pem': .., 'der': ..},
+                  'pub': {'pem': .., 'der': ..},
+                  'pkcs': '..',
+                  'req': '..',
+                  'password': '..'}
         """
-        key = self.mkpath('%s.key' % cn)
-        req = self.mkpath('%s.req' % cn)
-        pem = self.mkpath('%s.pem' % cn)
 
-        self.dbg('Generating key for %s: %s' % (cn, key))
+        password = self.conf.get('ssl_key_pass')
+
+        ret = {'priv': {'pem': self.mkpath('%s-priv.pem' % cn),
+                        'der': self.mkpath('%s-priv.der' % cn)},
+               'pub': {'pem': self.mkpath('%s-pub.pem' % cn),
+                       'der': self.mkpath('%s-pub.der' % cn)},
+               'pkcs': self.mkpath('%s.pfx' % cn),
+               'req': self.mkpath('%s.req' % cn),
+               'password': password}
+
+        self.dbg('Generating key for %s: %s' % (cn, ret['priv']['pem']))
         self.exec_cmd('openssl genrsa -des3 -passout "pass:%s" -out "%s" 1024' % \
-                      (self.conf.get('ssl_key_pass'), key))
+                      (password, ret['priv']['pem']))
 
-        self.dbg('Generating request for %s: %s' % (cn, req))
+        self.dbg('Generating request for %s: %s' % (cn, ret['req']))
         self.exec_cmd('openssl req -passin "pass:%s" -passout "pass:%s" -key "%s" -new -out "%s" -subj "%s"' % \
-                      (self.conf.get('ssl_key_pass'),
-                       self.conf.get('ssl_key_pass'),
-                       key, req, self.mksubj(cn)))
+                      (password, password,
+                       ret['priv']['pem'], ret['req'], self.mksubj(cn)))
 
         self.dbg('Signing key for %s' % (cn))
         self.exec_cmd('openssl x509 -req -passin "pass:%s" -in "%s" -CA "%s" -CAkey "%s" -CAserial "%s" -out "%s"' %\
-                      (self.conf.get('ssl_key_pass'),
-                       req, self.ca_cert, self.ca_key, self.ca_srl, pem))
+                      (password,
+                       ret['req'], self.ca['pem'], self.ca['key'], self.ca['srl'],
+                       ret['pub']['pem']))
 
-        return (key, req, pem)
+        self.dbg('Converting public-key X.509 to DER for %s' % cn)
+        self.exec_cmd('openssl x509 -outform der -in "%s" -out "%s"' % \
+                      (ret['pub']['pem'], ret['pub']['der']))
 
-                       
+        self.dbg('Converting private-key X.509 to DER for %s' % cn)
+        self.exec_cmd('openssl rsa -outform der -passin "pass:%s" -in "%s" -out "%s"' % \
+                      (password, ret['priv']['pem'], ret['priv']['der']))
+
+        self.dbg('Creating PKCS#12 for %s in %s' % (cn, ret['pkcs']))
+        self.exec_cmd('openssl pkcs12 -export -out "%s" -inkey "%s" -in "%s" -CAfile "%s" -certfile "%s" -passin "pass:%s" -passout "pass:%s"' % \
+                      (ret['pkcs'],
+                       ret['priv']['pem'],
+                       ret['pub']['pem'],
+                       self.ca['pem'],
+                       self.ca['pem'],
+                       password, password))
+
+        return ret
+
     def operational (self):
         return True
 

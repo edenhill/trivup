@@ -14,10 +14,10 @@ if __name__ == '__main__':
     ssl = SslApp(cluster)
 
     a = ssl.create_keystore('mybroker')
-    print('created keystore: %s' % str(a))
+    print('created keystore: %s' % a)
 
-    b = ssl.create_key('myclient')
-    print('created key: %s' % str(b))
+    r = ssl.create_cert('myclient')
+    print('created key: %s' % r)
 
     cluster.cleanup(keeptypes=[])
 
