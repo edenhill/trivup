@@ -30,10 +30,10 @@ class KerberosKdcApp (trivup.App):
         self.conf['stash_file'] = self.mkpath('stash_file')
 
         if self.conf.get('renew_lifetime', None) is None:
-            self.conf['renew_lifetime'] = 10*60
+            self.conf['renew_lifetime'] = '12h'
 
         if self.conf.get('ticket_lifetime', None) is None:
-            self.conf['ticket_lifetime'] = 60*60
+            self.conf['ticket_lifetime'] = '30m'
 
         # Set up cross-realm trusts, if desired.
         cross_realms = self.conf.get('cross_realms', '').split(',')
