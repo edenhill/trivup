@@ -15,3 +15,16 @@ broker versions.
 
 
 See [tests/usecase.py](tests/usecase.py) for a small showcase.
+
+## Quick start on Ubuntu
+
+Install Java 8 (follow Apache Kafka instructions, or just get Oracle Java from webupd8team)
+
+```
+$ java -version
+$ git clone git@github.com:edenhill/trivup.git
+$ cd trivup
+$ PYTHONPATH=$PWD ./tests/ssl.py
+$ PYTHONPATH=$PWD ./tests/usecase.py
+
+```
