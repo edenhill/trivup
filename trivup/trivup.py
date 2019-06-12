@@ -399,9 +399,13 @@ class App (object):
             stderr_fd = f.fileno()
             to_close.append(f)
 
+        f = open('/dev/null', 'r')
+        stdin_fd = f.fileno()
+        to_close.append(f)
+
         proc = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid,
                                 env=dict(os.environ, **self.env),
-                                stdout=stdout_fd, stderr=stderr_fd)
+                                stdout=stdout_fd, stderr=stderr_fd, stdin=stdin_fd)
         for f in to_close:
             f.close()
 
