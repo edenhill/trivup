@@ -117,3 +117,14 @@ class KerberosKdcApp (trivup.App):
         # Return keytab path
         return (principal, keytab)
 
+    @staticmethod
+    def add_cross_realm_tgts(kdcs):
+        """ Add cross-realm TGTs.
+            kdcs is a dict indexed by realm name, value is KerberosKdcApp. """
+        realms = kdcs.keys()
+        for realm in realms:
+            for crealm in [x for x in kcsrealms if x != realm]:
+                kdcs[realm].execute('kadmin.local -d "{}" -q "addprinc -requires_preauth -pw password krbtgt/{}@{}"'.format(kdcs[realm].conf.get('dbpath'), crealm, realm)).wait()
+                kdcs[realm].execute('kadmin.local -d "{}" -q "addprinc -requires_preauth -pw password krbtgt/{}@{}"'.format(kdcs[realm].conf.get('dbpath'), realm, crealm)).wait()
+
+

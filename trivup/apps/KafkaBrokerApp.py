@@ -1,5 +1,6 @@
 from trivup import trivup
 from trivup.apps.KerberosKdcApp import KerberosKdcApp
+from trivup.apps.SslApp import SslApp
 
 import contextlib
 import os
@@ -83,7 +84,8 @@ class KafkaBrokerApp (trivup.App):
             listeners.append('SASL_PLAINTEXT')
 
         # SSL support
-        if getattr(cluster, 'ssl', None) is not None:
+        ssl = cluster.find_app(SslApp)
+        if ssl is not None:
             # Add SSL listeners
             listeners.append('SSL')
             if len(sasl_mechs) > 0:
@@ -96,9 +98,10 @@ class KafkaBrokerApp (trivup.App):
         ports = [(x, trivup.TcpPortAllocator(self.cluster).next(self, self.conf.get('port_base', None))) for x in sorted(set(listeners))]
         self.conf['port'] = ports[0][1] # "Default" port
 
-        # Add host.docker.internal listener to allow services
-        # (e.g, SchemaRegistry) in docker-containers to reach the on-host Kafka
+        # Add docker listener to allow services (e.g, SchemaRegistry) in
+        # docker-containers to reach the on-host Kafka.
         docker_port = trivup.TcpPortAllocator(self.cluster).next(self)
+        docker_host = '%s:%d' % (cluster.get_docker_host(), docker_port)
 
         self.conf['address'] = '%s:%d' % (listener_host, self.conf['port'])
         listeners = ['%s://%s:%d' % (x[0], "0.0.0.0", x[1]) for x in ports]
@@ -108,8 +111,8 @@ class KafkaBrokerApp (trivup.App):
             self.conf['advertised_hostname'] = self.conf['nodename']
         advertised_listeners = ['%s://%s:%d' % (x[0], self.conf['advertised_hostname'], x[1]) for x in ports]
         # Expose service to docker containers as well.
-        advertised_listeners.append('DOCKER://host.docker.internal:%d' % docker_port)
-        self.conf['docker_advertised_listeners'] = 'PLAINTEXT://host.docker.internal:%d' % docker_port
+        advertised_listeners.append('DOCKER://%s' % docker_host)
+        self.conf['docker_advertised_listeners'] = 'PLAINTEXT://%s' % docker_host
         self.conf['advertised.listeners'] =','.join(advertised_listeners)
         self.conf['advertised_listeners'] = self.conf['advertised.listeners']
         self.conf['auto_create_topics'] = self.conf.get('auto_create_topics', 'true')
@@ -196,8 +199,7 @@ class KafkaBrokerApp (trivup.App):
             self.env_add('KAFKA_OPTS', '-Djava.security.debug=all')
 
         # SSL config and keys (et.al.)
-        if getattr(cluster, 'ssl', None) is not None:
-            ssl = cluster.ssl
+        if ssl is not None:
             keystore,truststore,_,_ = ssl.create_keystore('broker%s' % self.appid)
             conf_blob.append('ssl.protocol=TLS')
             conf_blob.append('ssl.enabled.protocols=TLSv1.2,TLSv1.1,TLSv1')

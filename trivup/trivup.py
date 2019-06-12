@@ -15,6 +15,7 @@ import random
 import socket
 import resource
 import datetime
+import sys
 
 
 class Cluster (object):
@@ -26,6 +27,11 @@ class Cluster (object):
         self.nodes = dict()
         for n in nodes:
             self.nodes[n] = Node(n)
+
+        if sys.platform == 'linux2':
+            self.platform = 'linux'
+        else:
+            self.platform = sys.platform
 
         self.apps = list()
 
@@ -73,6 +79,20 @@ class Cluster (object):
             return app
 
         return None
+
+    def find_apps (self, appclass, in_state=None):
+        """ Returns a list of app instances matching appclass (type). """
+        apps = []
+        for app in self.apps:
+            if not isinstance(app, appclass):
+                continue
+
+            if in_state is not None and app.state != in_state:
+                continue
+
+            apps.append(app)
+
+        return apps
 
     def deploy (self):
         """ @brief Deploy all apps in cluster """
@@ -149,12 +169,29 @@ class Cluster (object):
         """ Returns the instance path """
         return os.path.join(self.root_path, self.instance)
 
-    def mkpath (self, relpath, unique=False):
+    def mkpath (self, relpath, unique=False, in_instance=False):
         """ Cluster-wide path: will not be cleaned up. """
-        path = os.path.join(self.root_path, relpath)
+        if in_instance:
+            path = os.path.join(self.root_path, self.instance, relpath)
+        else:
+            path = os.path.join(self.root_path, relpath)
         if unique is True:
             path += '.' + str(uuid4())
         return path
+
+    def get_docker_host(self):
+        """ Get the docker host's name or IP from a container's point of view.
+            On OSX we use the handy host.docker.internal hostname, on Linux
+            we assume the docker container runs with --network=host and thus
+            has access to localhost ports. """
+        if self.platform == 'darwin':
+            return 'host.docker.internal'
+        elif self.platform == 'linux':
+            return 'localhost'
+
+        raise Exception("Unsupported platform: {}".format(self.platform))
+
+
 
 
 class Allocator (object):
