@@ -89,14 +89,29 @@ class KafkaBrokerApp (trivup.App):
             if len(sasl_mechs) > 0:
                 listeners.append('SASL_SSL')
 
+        # Map DOCKER listener to PLAINTEXT security protocol
+        conf_blob.append('listener.security.protocol.map=PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_PLAINTEXT:SASL_PLAINTEXT,SASL_SSL:SASL_SSL,DOCKER:PLAINTEXT')
+
         # Create listeners
         ports = [(x, trivup.TcpPortAllocator(self.cluster).next(self, self.conf.get('port_base', None))) for x in sorted(set(listeners))]
         self.conf['port'] = ports[0][1] # "Default" port
+
+        # Add host.docker.internal listener to allow services
+        # (e.g, SchemaRegistry) in docker-containers to reach the on-host Kafka
+        docker_port = trivup.TcpPortAllocator(self.cluster).next(self)
+
         self.conf['address'] = '%s:%d' % (listener_host, self.conf['port'])
-        self.conf['listeners'] = ','.join(['%s://%s:%d' % (x[0], listener_host, x[1]) for x in ports])
+        listeners = ['%s://%s:%d' % (x[0], "0.0.0.0", x[1]) for x in ports]
+        listeners.append('%s://%s:%d' % ('DOCKER', "0.0.0.0", docker_port))
+        self.conf['listeners'] = ','.join(listeners)
         if 'advertised_hostname' not in self.conf:
             self.conf['advertised_hostname'] = self.conf['nodename']
-        self.conf['advertised.listeners'] =','.join(['%s://%s:%d' % (x[0], self.conf['advertised_hostname'], x[1]) for x in ports])
+        advertised_listeners = ['%s://%s:%d' % (x[0], self.conf['advertised_hostname'], x[1]) for x in ports]
+        # Expose service to docker containers as well.
+        advertised_listeners.append('DOCKER://host.docker.internal:%d' % docker_port)
+        self.conf['docker_advertised_listeners'] = 'PLAINTEXT://host.docker.internal:%d' % docker_port
+        self.conf['advertised.listeners'] =','.join(advertised_listeners)
+        self.conf['advertised_listeners'] = self.conf['advertised.listeners']
         self.conf['auto_create_topics'] = self.conf.get('auto_create_topics', 'true')
         self.dbg('Listeners: %s' % self.conf['listeners'])
         self.dbg('Advertised Listeners: %s' % self.conf['advertised.listeners'])
