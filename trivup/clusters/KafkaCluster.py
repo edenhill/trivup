@@ -282,11 +282,13 @@ class KafkaCluster(object):
                     self.cluster.name, self.cluster.root_path,
                     self.cluster.instance))
 
-    def interactive(self):
+    def interactive(self, cmd=None):
         """ Execute an interactive shell that has all the
             environment variables set. """
 
-        print('# Interactive mode')
+        if cmd is None:
+            print('# Interactive mode')
+
         print("# - Waiting for cluster to go operational in {}/{}".format(
             self.cluster.root_path, self.cluster.instance))
         kc.wait_operational()
@@ -303,19 +305,26 @@ class KafkaCluster(object):
         print("# - Client configuration in {}".format(cf_path))
 
         # Prefix the standard prompt with cluster info.
-        pfx = '[TRIVUP:{}@{}] '.format(self.cluster.name, self.version)
-        cmd = 'bash --rcfile <(cat ~/.bashrc; echo \'PS1="{}$PS1"\') -i'.\
-                                                          format(pfx)
+        if cmd is None:
+            pfx = '[TRIVUP:{}@{}] '.format(self.cluster.name, self.version)
+            fullcmd = 'bash --rcfile <(cat ~/.bashrc; echo \'PS1="{}$PS1"\') -i'.\
+                                                                  format(pfx)
+            print("# - You're now in an interactive sub-shell, type 'exit' "
+                  "to exit back to your shell and stop the cluster.\n")
+            retcode = subprocess.call(fullcmd, env=env, shell=True,
+                                      executable='/bin/bash')
 
-        print("# - You're now in an interactive sub-shell, " +
-              "type 'exit' to exit back to your shell and stop the cluster.\n" +
-              "# - Connect to cluster with bootstrap.servers {}".format(
-                  self.bootstrap_servers))
-        retcode = subprocess.call(cmd, env=env, shell=True,
-                                  executable='/bin/bash')
+        else:
+            fullcmd = cmd
+            print("# - Executing: {}".format(fullcmd))
+            retcode = subprocess.call(fullcmd, env=env, shell=True)
+
+        print("# - Connect to cluster with bootstrap.servers {}".format(
+            self.bootstrap_servers))
+
         if retcode != 0:
             print("# - Shell exited with returncode {}: {}".format(
-                retcode, cmd))
+                retcode, fullcmd))
 
     def write_client_conf(self, path, additional_blob=None):
         """ Write client configuration (librdkafka) to \p path """
@@ -348,6 +357,8 @@ if __name__ == '__main__':
     parser.add_argument('--version', dest='version', type=str,
                         default=default_conf['version'],
                         help='Apache Kafka version')
+    parser.add_argument('--cmd', type=str, dest='cmd', default=None,
+                        help='Command to execute instead of interactive shell')
 
     args = parser.parse_args()
 
@@ -359,7 +370,7 @@ if __name__ == '__main__':
 
     kc = KafkaCluster(conf)
 
-    kc.interactive()
+    kc.interactive(args.cmd)
 
     print("# Stopping cluster in {}/{}".format(kc.cluster.root_path,
                                                kc.cluster.instance))
