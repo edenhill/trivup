@@ -363,6 +363,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     conf = {'debug': args.debug,
+            'version': args.version,
             'sasl.mechanism': args.sasl,
             'with_ssl': args.ssl,
             'with_sr': args.sr,
