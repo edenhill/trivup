@@ -80,7 +80,7 @@ else
 	# Download and install tarball
 	mkdir -p "$DEST_DIR"
 	if [[ -z "$KAFKA_URL" ]]; then
-	    KAFKA_URL="http://apache.mirrors.spacedump.net/kafka/${VERSION}/kafka_2.11-${VERSION}.tgz"
+	    KAFKA_URL="http://apache.mirrors.spacedump.net/kafka/${VERSION}/kafka_2.11-${VERSION}.tgz http://apache.mirrors.spacedump.net/kafka/${VERSION}/kafka_2.12-${VERSION}.tgz"
 	fi
 	TRY_URLS="$KAFKA_URL"
 	downloaded=0
@@ -89,6 +89,7 @@ else
 	    curl -L -s "$URL" | (cd $DEST_DIR && tar xzf - --strip-components=1) || continue
 	    echo "### $0: Successfully installed $VERSION to $DEST_DIR"
 	    downloaded=1
+            break
 	done
 	if [[ $downloaded == 0 ]]; then
 	   echo "# Download of $VERSION failed"
