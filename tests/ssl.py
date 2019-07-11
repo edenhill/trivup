@@ -3,9 +3,6 @@
 from trivup.trivup import Cluster
 from trivup.apps.SslApp import SslApp
 
-import subprocess
-import time
-
 
 if __name__ == '__main__':
     cluster = Cluster('TestCluster', 'tmp', debug=True)
@@ -20,4 +17,3 @@ if __name__ == '__main__':
     print('created key: %s' % r)
 
     cluster.cleanup(keeptypes=[])
-

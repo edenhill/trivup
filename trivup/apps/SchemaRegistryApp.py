@@ -1,10 +1,6 @@
 from trivup import trivup
 from trivup.apps.KafkaBrokerApp import KafkaBrokerApp
 
-import contextlib
-import os
-import socket
-import time
 import uuid
 import requests
 import subprocess
@@ -36,7 +32,6 @@ class SchemaRegistryApp (trivup.App):
 
         self.conf['container_id'] = 'trivup_sr_%s' % str(uuid.uuid4())[0:7]
         kafka = cluster.find_app(KafkaBrokerApp)
-        print kafka
         if kafka is None:
             raise Exception('KafkaBrokerApp required')
 
@@ -46,7 +41,8 @@ class SchemaRegistryApp (trivup.App):
             raise Exception('KafkaBrokerApp required')
 
         # Create listener
-        port = trivup.TcpPortAllocator(self.cluster).next(self, self.conf.get('port_base', None))
+        port = trivup.TcpPortAllocator(self.cluster).next(
+            self, self.conf.get('port_base', None))
 
         docker_args = ''
         if cluster.platform == 'linux':
@@ -65,11 +61,12 @@ class SchemaRegistryApp (trivup.App):
 
         # This is the listener address inside the docker container
         self.conf['listeners'] = 'http://0.0.0.0:%d' % self.conf.get('intport')
-        # This is the listener address outside the docker container, using port-forwarding
+        # This is the listener address outside the docker container,
+        # using port-forwarding
         self.conf['url'] = 'http://localhost:%d' % self.conf['extport']
 
         # Run in foreground.
-        self.conf['start_cmd'] = 'docker run %s --name %s -e SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS=%s  -e SCHEMA_REGISTRY_HOST_NAME=localhost   -e SCHEMA_REGISTRY_LISTENERS=%s  -e SCHEMA_REGISTRY_DEBUG=true %s' % (
+        self.conf['start_cmd'] = 'docker run %s --name %s -e SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS=%s  -e SCHEMA_REGISTRY_HOST_NAME=localhost   -e SCHEMA_REGISTRY_LISTENERS=%s  -e SCHEMA_REGISTRY_DEBUG=true %s' % (  # noqa: E501
             docker_args,
             self.conf.get('container_id'),
             bootstrap_servers,
@@ -77,21 +74,22 @@ class SchemaRegistryApp (trivup.App):
             self.conf.get('image'))
 
         # Stop through docker
-        self.conf['stop_cmd'] = 'docker stop %s' % self.conf.get('container_id')
+        self.conf['stop_cmd'] = 'docker stop %s' % \
+                                self.conf.get('container_id')
 
-    def operational (self):
+    def operational(self):
         self.dbg('Checking if %s is operational' % self.get('url'))
         try:
             r = requests.head(self.get('url'), timeout=1.0)
             if r.status_code >= 200 and r.status_code < 300:
                 return True
             raise Exception('status_code %d' % r.status_code)
-        except Exception, e:
+        except Exception as e:
             self.dbg('%s check failed: %s' % (self.get('url'), e))
             return False
 
-    def deploy (self):
+    def deploy(self):
         image = self.conf.get('image')
         self.dbg('Pulling docker image: %s' % image)
-        subprocess.check_call('(docker images -q "%s" 2>/dev/null | grep -q ^.) || docker pull %s' % (image, image), shell=True)
+        subprocess.check_call('(docker images -q "%s" 2>/dev/null | grep -q ^.) || docker pull %s' % (image, image), shell=True)  # noqa: E501
         pass

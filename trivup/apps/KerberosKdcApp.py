@@ -1,6 +1,5 @@
 from trivup import trivup
 import os
-import time
 
 
 class KerberosKdcApp (trivup.App):
@@ -13,7 +12,7 @@ class KerberosKdcApp (trivup.App):
         @param realm       Realm name
         @param conf        Configuration dict, optional.
            "port": port to bind to.
-           "cross_realms": "realm1=kdc1:port,realm2=kdc2:port" - set up cross-realm.
+           "cross_realms": "realm1=kdc1:port,realm2=kdc2:port" - cross-realm.
                            The first cross realm is the $default_realm.
            "renew_lifetime": see krb5.conf docs  (default 10 min)
            "ticket_lifetime": see krb5.conf docs (default 60 min)
@@ -23,7 +22,7 @@ class KerberosKdcApp (trivup.App):
 
         self.conf['realm'] = realm
         if self.conf.get('port', None) is None:
-            self.conf['port'] = trivup.TcpPortAllocator(self.cluster).next(self)
+            self.conf['port'] = trivup.TcpPortAllocator(self.cluster).next(self)  # noqa: E501
         self.conf['address'] = '%(nodename)s:%(port)d' % self.conf
         self.conf['dbpath'] = self.mkpath('database')
         self.conf['admin_keytab'] = self.mkpath('admin_keytab')
@@ -44,7 +43,7 @@ class KerberosKdcApp (trivup.App):
                 crealm, ckdc = crinfo.split('=')
                 if crealm == realm:
                     continue
-                cross_realms_conf += " %s = {\n  kdc = %s\n  admin_server = %s\n }\n" % (crealm, ckdc, ckdc)  # self.conf.get('nodename'))
+                cross_realms_conf += " %s = {\n  kdc = %s\n  admin_server = %s\n }\n" % (crealm, ckdc, ckdc)  # noqa: E501
                 capaths_conf += " %s = {\n  %s = .\n }\n" % (crealm, realm)
                 capaths_conf += " %s = {\n  %s = .\n }\n" % (realm, crealm)
 
@@ -65,26 +64,23 @@ class KerberosKdcApp (trivup.App):
         self.env_add('KRB5_KDC_PROFILE', self.conf['kdc_conf'])
 
         # Create database and stash file
-        r = self.execute('kdb5_util -P "" -r %(realm)s -d "%(dbpath)s" -sf "%(stash_file)s" create -s' % self.conf).wait()
+        r = self.execute('kdb5_util -P "" -r %(realm)s -d "%(dbpath)s" -sf "%(stash_file)s" create -s' % self.conf).wait()  # noqa: E501
         if r != 0:
             raise Exception('Failed to create kdb5 database')
 
         self.conf['start_cmd'] = '/usr/sbin/krb5kdc -n'
-        self.conf['stop_cmd'] = None # Ctrl-C
+        self.conf['stop_cmd'] = None  # Ctrl-C
 
-    def operational (self):
+    def operational(self):
         self.dbg('Checking if operational: FIXME')
         return True
-        #return os.system('(echo anything | nc %s) 2>/dev/null' %
-        #' '.join(self.get('address').split(':'))) == 0
 
-
-    def deploy (self):
+    def deploy(self):
         """ Requires krb5kdc to be installed through other means, e.g.:
              sudo apt-get install krb5-kdc krb5-admin-server """
         pass
 
-    def add_principal (self, primary, instance=None):
+    def add_principal(self, primary, instance=None):
         """
         @brief Add principal to server and generate keytab
         @param primary The principal primary ("primary/instance@realm")
@@ -97,7 +93,7 @@ class KerberosKdcApp (trivup.App):
         else:
             principal = '%s@%s' % (primary, self.conf['realm'])
 
-        r = self.execute('kadmin.local -d "%s" -q "addprinc -randkey %s"' % \
+        r = self.execute('kadmin.local -d "%s" -q "addprinc -randkey %s"' %
                          (self.conf.get('dbpath'), principal)).wait()
         if r != 0:
             raise Exception('ktadmin addprinc failed')
@@ -109,7 +105,7 @@ class KerberosKdcApp (trivup.App):
         else:
             keytab = self.mkpath(os.path.join(keytabdir, "default"))
 
-        r = self.execute('kadmin.local -d "%s" -q "ktadd -k "%s" %s"' % \
+        r = self.execute('kadmin.local -d "%s" -q "ktadd -k "%s" %s"' %
                          (self.conf.get('dbpath'), keytab, principal)).wait()
         if r != 0:
             raise Exception('ktadmin ktadd failed')
@@ -123,8 +119,6 @@ class KerberosKdcApp (trivup.App):
             kdcs is a dict indexed by realm name, value is KerberosKdcApp. """
         realms = kdcs.keys()
         for realm in realms:
-            for crealm in [x for x in kcsrealms if x != realm]:
-                kdcs[realm].execute('kadmin.local -d "{}" -q "addprinc -requires_preauth -pw password krbtgt/{}@{}"'.format(kdcs[realm].conf.get('dbpath'), crealm, realm)).wait()
-                kdcs[realm].execute('kadmin.local -d "{}" -q "addprinc -requires_preauth -pw password krbtgt/{}@{}"'.format(kdcs[realm].conf.get('dbpath'), realm, crealm)).wait()
-
-
+            for crealm in [x for x in realms if x != realm]:
+                kdcs[realm].execute('kadmin.local -d "{}" -q "addprinc -requires_preauth -pw password krbtgt/{}@{}"'.format(kdcs[realm].conf.get('dbpath'), crealm, realm)).wait()  # noqa: E501
+                kdcs[realm].execute('kadmin.local -d "{}" -q "addprinc -requires_preauth -pw password krbtgt/{}@{}"'.format(kdcs[realm].conf.get('dbpath'), realm, crealm)).wait()  # noqa: E501

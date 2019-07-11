@@ -35,35 +35,37 @@ import argparse
 import subprocess
 
 
-# conf dict structure with defaults:
-# commented-out fields are not defaults but show what is available.
-default_conf = {
-    'version': '2.2.0',  # Apache Kafka version
-    'cp_version': '5.2.1',  # Confluent Platform version (for SchemaRegistry)
-    'broker_cnt': 3,
-    'sasl.mechanism': '',  # or GSSAPI, PLAIN, SCRAM-.., OAUTHBEARER
-    #  GSSAPI/Kerberos
-    'realm_cnt': 1,
-    'krb_renew_lifetime': 30,
-    'krb_ticket_lifetime': 120,
-    # SASL PLAIN/SCRAM
-    'sasl_users': 'testuser=testpass',
-    # With SSL
-    'with_ssl': False,
-    # With SchemaRegistry
-    'with_sr': False,
-    # Debug trivup
-    'debug': False,
-    # Additional broker server.properties configuration
-    # 'broker_conf': ['connections.max.idle.ms=1234', ..]
-}
-
-
 class KafkaCluster(object):
-    def __init__(self, conf=None):
+    # conf dict structure with defaults:
+    # commented-out fields are not defaults but show what is available.
+    default_conf = {
+        'version': '2.2.0',     # Apache Kafka version
+        'cp_version': '5.2.1',  # Confluent Platform version (for SR)
+        'broker_cnt': 3,
+        'sasl_mechanism': '',   # GSSAPI, PLAIN, SCRAM-.., ...
+        'realm_cnt': 1,
+        'krb_renew_lifetime': 30,
+        'krb_ticket_lifetime': 120,
+        # SASL PLAIN/SCRAM
+        'sasl_users': 'testuser=testpass',
+        # With SSL
+        'with_ssl': False,
+        # With SchemaRegistry
+        'with_sr': False,
+        # Debug trivup
+        'debug': False,
+        # Additional broker server.properties configuration
+        # 'broker_conf': ['connections.max.idle.ms=1234', ..]
+    }
+
+
+    def __init__(self, **kwargs):
+        """ Create and start a KafkaCluster.
+            See default_conf above for parameters. """
         super(KafkaCluster, self).__init__()
 
-        self.conf = deepcopy(default_conf)
+        conf = kwargs
+        self.conf = deepcopy(self.default_conf)
         if conf is not None:
             self.conf.update(conf)
 
@@ -75,10 +77,10 @@ class KafkaCluster(object):
             os.environ.get('TRIVUP_ROOT', 'tmp-%s' % self.__class__.__name__),
             debug=bool(self.conf.get('debug', False)))
 
-        self.client_conf = dict()
+        self._client_conf = dict()
         self.env = dict()
 
-        self.sasl_mechanism = self.conf.get('sasl.mechanism')
+        self.sasl_mechanism = self.conf.get('sasl_mechanism')
 
         # Generate SSL certs if enabled
         if bool(self.conf.get('with_ssl')):
@@ -140,15 +142,15 @@ class KafkaCluster(object):
         self.cluster.deploy()
 
         # Start cluster
-        self.cluster.start()
+        self.start()
 
-        # Set up additional convenience envs
-        self._setup_env()
+    def __del__(self):
+        """ Destructor: forcibly stop the cluster """
+        self.stop(force=True)
 
     def _setup_env(self):
         """ Set up convenience envs """
-        self.env['KAFKA_PATH'] = self.cluster.find_app(KafkaBrokerApp).\
-                                 get('destdir')
+        self.env['KAFKA_PATH'] = self.cluster.find_app(KafkaBrokerApp).get('destdir')  # noqa: E501
         self.env['ZK_ADDRESS'] = self.zk.get('address')
         self.env['BROKERS'] = self.bootstrap_servers
         self.env['KAFKA_VERSION'] = self.version
@@ -158,54 +160,53 @@ class KafkaCluster(object):
         for b in self.cluster.find_apps(KafkaBrokerApp, 'started'):
             self.env['BROKER_PID_%d' % b.appid] = str(b.proc.pid)
 
-
     def _setup_client_conf(self):
         """ Set up librdkafka client configuration """
-        self.client_conf['bootstrap.servers'] = self.bootstrap_servers
-        self.client_conf['broker.address.family'] = 'v4'
+        self._client_conf['bootstrap.servers'] = self.bootstrap_servers
+        self._client_conf['broker.address.family'] = 'v4'
         if self.security_protocol != 'PLAINTEXT':
-            self.client_conf['security.protocol'] = self.security_protocol
+            self._client_conf['security.protocol'] = self.security_protocol
 
         broker_version = self.conf.get('version')
         brver = broker_version.split('.')
         if brver[0] == 0 and brver[1] < 10:
-            self.client_conf['broker.version.fallback'] = broker_version
-            self.client_conf['api.version.request'] = 'false'
+            self._client_conf['broker.version.fallback'] = broker_version
+            self._client_conf['api.version.request'] = 'false'
 
         # Client SASL configuration
         if self.sasl_mechanism:
-            self.client_conf['sasl.mechanism'] = self.sasl_mechanism
+            self._client_conf['sasl.mechanism'] = self.sasl_mechanism
 
             if self.sasl_mechanism == 'PLAIN' or \
                self.sasl_mechanism.find('SCRAM') != -1:
                 # Use first user as SASL user/pass
                 for up in self.conf.get('sasl_users', '').split(','):
                     u, p = up.split('=')
-                    self.client_conf['sasl.username'] = u
-                    self.client_conf['sasl.username'] = p
+                    self._client_conf['sasl.username'] = u
+                    self._client_conf['sasl.username'] = p
                     break
 
             elif self.sasl_mechanism == 'OAUTHBEARER':
-                self.client_conf['enable.sasl.oauthbearer.unsecure.jwt'] = True
+                self._client_conf['enable.sasl.oauthbearer.unsecure.jwt'] = True
                 self.client.conf['sasl.oauthbearer.config'] = \
                     'scope=requiredScope principal=admin'
 
         # Client SSL configuration
         if self.ssl is not None:
             key = self.ssl.create_cert('client')
-            self.client_conf['ssl.ca.location'] = self.ssl.ca['pem']
-            self.client_conf['ssl.certificate.location'] = key['pub']['pem']
-            self.client_conf['ssl.key.location'] = key['priv']['pem']
-            self.client_conf['ssl.key.password'] = key['password']
+            self._client_conf['ssl.ca.location'] = self.ssl.ca['pem']
+            self._client_conf['ssl.certificate.location'] = key['pub']['pem']
+            self._client_conf['ssl.key.location'] = key['priv']['pem']
+            self._client_conf['ssl.key.password'] = key['password']
 
             # Add envs pointing out locations of the generated certs
-            for k, v in self.ssl.ca.iteritems():
+            for k, v in self.ssl.ca.items():
                 self.env['SSL_ca_{}'.format(k)] = v
 
             # Set envs for all generated keys so tests can find them.
-            for k, v in key.iteritems():
+            for k, v in key.items():
                 if type(v) is dict:
-                    for k2, v2 in v.iteritems():
+                    for k2, v2 in v.items():
                         # E.g. "SSL_priv_der=path/to/librdkafka-priv.der"
                         self.env['SSL_{}_{}'.format(k, k2)] = v2
                 else:
@@ -261,17 +262,34 @@ class KafkaCluster(object):
         self.env['KRB5_KDC_PROFILE'] = self.client_kdc.conf['kdc_conf']
         principal, keytab = self.client_kdc.add_principal('admin')
 
-        self.client_conf['sasl.kerberos.keytab'] = keytab
-        self.client_conf['sasl.kerberos.principal'] = principal.split('@')[0]
+        self._client_conf['sasl.kerberos.keytab'] = keytab
+        self._client_conf['sasl.kerberos.principal'] = principal.split('@')[0]
         # Refresh ticket 60s before renew timeout.
-        self.client_conf['sasl.kerberos.min.time.before.relogin'] = \
+        self._client_conf['sasl.kerberos.min.time.before.relogin'] = \
             max(1, int(self.conf.get('krb_renew_lifetime')) - 60) * 1000
 
-    def stop(self, cleanup=True, keeptypes=['log'], force=False):
+    def start(self, timeout=0):
+        """ Start cluster """
+        self.cluster.start()
+
+        # Set up additional convenience envs
+        self._setup_env()
+
+        if timeout > 0:
+            self.wait_operational(timeout)
+
+    def stop(self, cleanup=True, keeptypes=['log'], force=False, timeout=0):
         """ Stop cluster and clean up """
         self.cluster.stop(force=True)
+        if timeout > 0:
+            self.cluster.wait_stopped(timeout)
         if cleanup:
             self.cluster.cleanup(keeptypes)
+
+    def stopped(self):
+        """ Returns True when all components of the cluster are stopped """
+        return len([x for x in self.cluster.apps if
+                    x.status() == 'stopped']) == len(self.cluster.apps)
 
     def wait_operational(self, timeout=60):
         """ Wait for cluster to go operational """
@@ -281,6 +299,20 @@ class KafkaCluster(object):
                 "Cluster {} did not go operational, see logs in {}/{}".format(
                     self.cluster.name, self.cluster.root_path,
                     self.cluster.instance))
+
+    def stop_broker(self, broker_id):
+        """ Stop single broker """
+        broker = self.brokers.get(broker_id, None)
+        if broker is None:
+            raise LookupError("Unknown broker id {}".format(broker_id))
+        broker.stop()
+
+    def start_broker(self, broker_id):
+        """ Start single broker """
+        broker = self.brokers.get(broker_id, None)
+        if broker is None:
+            raise LookupError("Unknown broker id {}".format(broker_id))
+        broker.start()
 
     def interactive(self, cmd=None):
         """ Execute an interactive shell that has all the
@@ -307,8 +339,7 @@ class KafkaCluster(object):
         # Prefix the standard prompt with cluster info.
         if cmd is None:
             pfx = '[TRIVUP:{}@{}] '.format(self.cluster.name, self.version)
-            fullcmd = 'bash --rcfile <(cat ~/.bashrc; echo \'PS1="{}$PS1"\') -i'.\
-                                                                  format(pfx)
+            fullcmd = 'bash --rcfile <(cat ~/.bashrc; echo \'PS1="{}$PS1"\') -i'.format(pfx)  # noqa: E501
             print("# - You're now in an interactive sub-shell, type 'exit' "
                   "to exit back to your shell and stop the cluster.\n")
             retcode = subprocess.call(fullcmd, env=env, shell=True,
@@ -326,14 +357,18 @@ class KafkaCluster(object):
             print("# - Shell exited with returncode {}: {}".format(
                 retcode, fullcmd))
 
+    def client_conf(self):
+        """ Get a dict copy of the client configuration """
+        return deepcopy(self._client_conf)
+
     def write_client_conf(self, path, additional_blob=None):
-        """ Write client configuration (librdkafka) to \p path """
-        with  open(path, "w") as f:
-            for k, v in self.client_conf.iteritems():
-                f.write(('%s=%s\n' % (k, v)).encode('ascii'))
+        """ Write client configuration (librdkafka) to @param path """
+        with open(path, "w") as f:
+            for k, v in self._client_conf.items():
+                f.write(str('%s=%s\n' % (k, v)))
             if additional_blob is not None:
-                f.write(('#\n# Additional configuration:').encode('ascii'))
-                f.write(additional_blob.encode('ascii'))
+                f.write(str('#\n# Additional configuration:'))
+                f.write(str(additional_blob))
 
 
 if __name__ == '__main__':
@@ -342,8 +377,8 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true', dest='debug',
                         default=False, help='Enable trivup debugging')
     parser.add_argument('--sasl', dest='sasl', type=str,
-                        default=default_conf['sasl.mechanism'],
-                        help='SASL mechanism (PLAIN, SCRAM-SHA-nnn, GSSAPI, '+
+                        default=default_conf['sasl_mechanism'],
+                        help='SASL mechanism (PLAIN, SCRAM-SHA-nnn, GSSAPI, ' +
                         'OAUTHBEARER)')
     parser.add_argument('--ssl', dest='ssl', action='store_true',
                         default=default_conf['with_ssl'],
@@ -364,12 +399,12 @@ if __name__ == '__main__':
 
     conf = {'debug': args.debug,
             'version': args.version,
-            'sasl.mechanism': args.sasl,
+            'sasl_mechanism': args.sasl,
             'with_ssl': args.ssl,
             'with_sr': args.sr,
             'broker_cnt': args.broker_cnt}
 
-    kc = KafkaCluster(conf)
+    kc = KafkaCluster(**conf)
 
     kc.interactive(args.cmd)
 
