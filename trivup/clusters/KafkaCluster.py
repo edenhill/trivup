@@ -377,20 +377,20 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true', dest='debug',
                         default=False, help='Enable trivup debugging')
     parser.add_argument('--sasl', dest='sasl', type=str,
-                        default=default_conf['sasl_mechanism'],
+                        default=KafkaCluster.default_conf['sasl_mechanism'],
                         help='SASL mechanism (PLAIN, SCRAM-SHA-nnn, GSSAPI, ' +
                         'OAUTHBEARER)')
     parser.add_argument('--ssl', dest='ssl', action='store_true',
-                        default=default_conf['with_ssl'],
+                        default=KafkaCluster.default_conf['with_ssl'],
                         help='Enable SSL')
     parser.add_argument('--sr', dest='sr', action='store_true',
-                        default=default_conf['with_sr'],
+                        default=KafkaCluster.default_conf['with_sr'],
                         help='Enable SchemaRegistry')
     parser.add_argument('--brokers', dest='broker_cnt', type=int,
-                        default=default_conf['broker_cnt'],
+                        default=KafkaCluster.default_conf['broker_cnt'],
                         help='Number of Kafka brokers')
     parser.add_argument('--version', dest='version', type=str,
-                        default=default_conf['version'],
+                        default=KafkaCluster.default_conf['version'],
                         help='Apache Kafka version')
     parser.add_argument('--cmd', type=str, dest='cmd', default=None,
                         help='Command to execute instead of interactive shell')
