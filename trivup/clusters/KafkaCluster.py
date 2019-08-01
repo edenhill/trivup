@@ -183,7 +183,7 @@ class KafkaCluster(object):
                 for up in self.conf.get('sasl_users', '').split(','):
                     u, p = up.split('=')
                     self._client_conf['sasl.username'] = u
-                    self._client_conf['sasl.username'] = p
+                    self._client_conf['sasl.password'] = p
                     break
 
             elif self.sasl_mechanism == 'OAUTHBEARER':
