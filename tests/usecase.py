@@ -21,7 +21,7 @@ if __name__ == '__main__':
     zk1 = ZookeeperApp(cluster, bin_path=os.path.join(kafka_dir, '/bin/zookeeper-server-start.sh'))
 
     # Multiple Kafka brokers
-    conf = {'version': '2.2.0', 'replication_factor': 3, 'num_partitions': 4, 'kafka_path': kafka_dir}
+    conf = {'version': '2.2.0', 'replication_factor': 3, 'num_partitions': 4}
     broker1 = KafkaBrokerApp(cluster, conf)
     broker2 = KafkaBrokerApp(cluster, conf)
     broker3 = KafkaBrokerApp(cluster, conf)
