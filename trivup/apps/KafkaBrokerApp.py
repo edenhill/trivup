@@ -2,6 +2,7 @@ from trivup import trivup
 from trivup.apps.KerberosKdcApp import KerberosKdcApp
 from trivup.apps.SslApp import SslApp
 
+from string import Template
 import contextlib
 import os
 import socket
@@ -256,7 +257,7 @@ class KafkaBrokerApp (trivup.App):
         # Generate config file
         self.conf['conf_file'] = self.create_file_from_template('server.properties',  # noqa: E501
                                                                 self.conf,
-                                                                append_data='\n'.join(conf_blob))  # noqa: E501
+                                                                append_data=Template('\n'.join(conf_blob)).substitute(self.conf))  # noqa: E501
 
         # Generate LOG4J file (if app debug is enabled)
         if self.debug:
