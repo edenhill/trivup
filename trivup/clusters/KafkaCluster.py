@@ -188,7 +188,7 @@ class KafkaCluster(object):
 
             elif self.sasl_mechanism == 'OAUTHBEARER':
                 self._client_conf['enable.sasl.oauthbearer.unsecure.jwt'] = True
-                self.client.conf['sasl.oauthbearer.config'] = \
+                self._client_conf['sasl.oauthbearer.config'] = \
                     'scope=requiredScope principal=admin'
 
         # Client SSL configuration
