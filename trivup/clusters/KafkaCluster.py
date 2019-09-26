@@ -335,13 +335,15 @@ class KafkaCluster(object):
         self.write_client_conf(cf_path)
         env['RDKAFKA_TEST_CONF'] = cf_path
         print("# - Client configuration in {}".format(cf_path))
+        print("# - Connect to cluster with bootstrap.servers {}".format(
+            self.bootstrap_servers))
 
         # Prefix the standard prompt with cluster info.
         if cmd is None:
             pfx = '[TRIVUP:{}@{}] '.format(self.cluster.name, self.version)
             fullcmd = 'bash --rcfile <(cat ~/.bashrc; echo \'PS1="{}$PS1"\') -i'.format(pfx)  # noqa: E501
             print("# - You're now in an interactive sub-shell, type 'exit' "
-                  "to exit back to your shell and stop the cluster.\n")
+                  "to stop the cluster and exit back to your shell.\n")
             retcode = subprocess.call(fullcmd, env=env, shell=True,
                                       executable='/bin/bash')
 
@@ -349,9 +351,6 @@ class KafkaCluster(object):
             fullcmd = cmd
             print("# - Executing: {}".format(fullcmd))
             retcode = subprocess.call(fullcmd, env=env, shell=True)
-
-        print("# - Connect to cluster with bootstrap.servers {}".format(
-            self.bootstrap_servers))
 
         if retcode != 0:
             print("# - Shell exited with returncode {}: {}".format(
