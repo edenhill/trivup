@@ -28,20 +28,28 @@
 
 from trivup import trivup
 from trivup.apps.KafkaBrokerApp import KafkaBrokerApp
+from trivup.apps.SslApp import SslApp
 
-import uuid
 import requests
-import subprocess
 
 
-class SchemaRegistryApp (trivup.App):
+sr_image = 'confluentinc/cp-schema-registry'
+
+
+class SchemaRegistryApp (trivup.DockerApp):
     """ Confluent Schema Registry app.
         Depends on KafkaBrokerApp.
         Requires docker. """
 
-    default_image = 'confluentinc/cp-schema-registry:5.2.1'
+    default_conf = {
+        'debug': True,
+        'host_name': 'localhost',
+        'listeners': 'http://0.0.0.0:8081'
+    }
 
-    def __init__(self, cluster, conf=None, on=None):
+    default_version = '5.3.0'
+
+    def __init__(self, cluster, conf=None, on='docker'):
         """
         @param cluster     Current cluster
         @param conf        Configuration dict, see below.
@@ -50,74 +58,81 @@ class SchemaRegistryApp (trivup.App):
         Supported conf keys:
            * version - Confluent Platform version to use.
            * port_base - Low TCP port base to start allocating from (random)
-           * image - docker image to use
-           * conf - schema-registry docker image config strings (NOT USED)
+           * conf - Confluent Schema Registry configs
         """
-        super(SchemaRegistryApp, self).__init__(cluster, conf=conf, on=on)
 
-        if self.conf.get('image', '') == '':
-            self.conf['image'] = self.default_image
+        app_conf = dict(self.default_conf, **conf.get('conf', {}))
+        # docker run options to be run on startup
+        docker_opts = []
 
-        self.conf['container_id'] = 'trivup_sr_%s' % str(uuid.uuid4())[0:7]
+        version = conf.get('version', self.default_version)
+
         kafka = cluster.find_app(KafkaBrokerApp)
-        if kafka is None:
+        if kafka:
+            app_conf['kafkastore_bootstrap_servers'] =\
+                kafka.conf.get('docker_advertised_listeners')
+        else:
             raise Exception('KafkaBrokerApp required')
 
-        bootstrap_servers = kafka.conf.get('docker_advertised_listeners')
+        # Find available port on the host
+        port = trivup.TcpPortAllocator(cluster).next(
+            self, conf.get('port_base', None))
 
-        if bootstrap_servers is None:
-            raise Exception('KafkaBrokerApp required')
+        self.expose_port(docker_opts, 8081, port)
 
-        # Create listener
-        port = trivup.TcpPortAllocator(self.cluster).next(
-            self, self.conf.get('port_base', None))
+        protocol = 'http'
+        ssl = cluster.find_app(SslApp)
+        if ssl is not None:
+            # Mount SslApp dir, reuse broker trusts/certs
+            self.add_mount(docker_opts, "/ssl", ssl.root_path())
 
-        docker_args = ''
-        if cluster.platform == 'linux':
-            # Let container bind to host localhost
-            self.conf['extport'] = port
-            self.conf['intport'] = port
-            docker_args = '--network=host'
+            protocol = "https"
+            app_conf['listeners'] = "https://0.0.0.0:8081"
+            app_conf['inter_instance_protocol'] = 'https'
 
-        elif cluster.platform == 'darwin':
-            # On OSX localhost binds are not possible, so set up a
-            # port forwarding.
-            self.conf['extport'] = port
-            self.conf['intport'] = 8081
-            docker_args = '-p %d:%d' % (self.conf['extport'],
-                                        self.conf['intport'])
+            app_conf['ssl_keystore_location'] =\
+                "/ssl/broker{}.keystore.jks".format(kafka.appid)
+            app_conf['ssl_keystore_password'] =\
+                ssl.conf.get('ssl_key_pass')
+            app_conf['ssl_key_password'] =\
+                ssl.conf.get('ssl_key_pass')
 
-        # This is the listener address inside the docker container
-        self.conf['listeners'] = 'http://0.0.0.0:%d' % self.conf.get('intport')
+            app_conf['ssl_truststore_location'] =\
+                "/ssl/broker{}.truststore.jks".format(kafka.appid)
+            app_conf['ssl_truststore_password'] =\
+                ssl.conf.get('ssl_key_pass')
+
+        # Capture app_conf state for use on startup
+        def configure():
+            return ["SCHEMA_REGISTRY_{}={}".format(key.upper(), value)
+                    for key, value in app_conf.items()]
+
+        # Handle all docker specific after setting the context
+        super(SchemaRegistryApp, self).__init__(cluster,
+                                                sr_image,
+                                                version,
+                                                configure)
+
+        # if ssl is not None:
+        #     self.docker_args.append("--mount type=bind,source={},"
+        #                             "destination=/ssl".format(
+        #                                 ssl.root_path()))
+
+
+        # self.docker_args.append('-p {}:8081'.format(port))
+
+        self.docker_args = docker_opts
         # This is the listener address outside the docker container,
         # using port-forwarding
-        self.conf['url'] = 'http://localhost:%d' % self.conf['extport']
-
-        # Run in foreground.
-        self.conf['start_cmd'] = 'docker run %s --name %s -e SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS=%s  -e SCHEMA_REGISTRY_HOST_NAME=localhost   -e SCHEMA_REGISTRY_LISTENERS=%s  -e SCHEMA_REGISTRY_DEBUG=true %s' % (  # noqa: E501
-            docker_args,
-            self.conf.get('container_id'),
-            bootstrap_servers,
-            self.conf.get('listeners'),
-            self.conf.get('image'))
-
-        # Stop through docker
-        self.conf['stop_cmd'] = 'docker stop %s' % \
-                                self.conf.get('container_id')
+        self.conf['url'] = '{}://localhost:{}'.format(protocol, port)
 
     def operational(self):
         self.dbg('Checking if %s is operational' % self.get('url'))
         try:
-            r = requests.head(self.get('url'), timeout=1.0)
+            r = requests.head(self.get('url'), timeout=1.0, verify=False)
             if r.status_code >= 200 and r.status_code < 300:
                 return True
             raise Exception('status_code %d' % r.status_code)
         except Exception as e:
             self.dbg('%s check failed: %s' % (self.get('url'), e))
             return False
-
-    def deploy(self):
-        image = self.conf.get('image')
-        self.dbg('Pulling docker image: %s' % image)
-        subprocess.check_call('(docker images -q "%s" 2>/dev/null | grep -q ^.) || docker pull %s' % (image, image), shell=True)  # noqa: E501
-        pass

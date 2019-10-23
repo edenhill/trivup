@@ -48,17 +48,16 @@
 #
 # See conf dict structure below.
 
-from trivup.trivup import Cluster, TcpPortAllocator
-from trivup.apps.ZookeeperApp import ZookeeperApp
+from copy import deepcopy
 from trivup.apps.KafkaBrokerApp import KafkaBrokerApp
 from trivup.apps.KerberosKdcApp import KerberosKdcApp
 from trivup.apps.SchemaRegistryApp import SchemaRegistryApp
 from trivup.apps.SslApp import SslApp
+from trivup.apps.ZookeeperApp import ZookeeperApp
+from trivup.trivup import Cluster, TcpPortAllocator
 
-from copy import deepcopy
-
-import os
 import argparse
+import os
 import subprocess
 
 
@@ -101,6 +100,7 @@ class KafkaCluster(object):
         self.cluster = Cluster(
             self.__class__.__name__,
             os.environ.get('TRIVUP_ROOT', 'tmp-%s' % self.__class__.__name__),
+            nodes=['localhost', 'docker'],
             debug=bool(self.conf.get('debug', False)))
 
         self._client_conf = dict()

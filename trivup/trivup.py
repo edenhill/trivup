@@ -27,21 +27,22 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-import os
-import signal
-from string import Template
-from uuid import uuid4
 from copy import deepcopy
 from collections import defaultdict
-import subprocess
-import shutil
-import time
-import pkgutil
-import pkg_resources
-import socket
-import resource
+from string import Template
+from uuid import uuid4
+
 import datetime
+import os
+import pkg_resources
+import pkgutil
+import resource
+import shutil
+import signal
+import socket
+import subprocess
 import sys
+import time
 
 
 class Cluster (object):
@@ -283,6 +284,8 @@ class Node (object):
         self.name = name
         if name == 'localhost':
             self.exec_cmd = ''
+        elif name == 'docker':
+            self.exec_cmd = 'docker'
         else:
             self.exec_cmd = 'ssh %s ' % name
 
@@ -640,6 +643,72 @@ class App (object):
     def __str__(self):
         return '{%s@%s:%s(%s)}' % (self.name, self.node.name,
                                    self.appid, self.state)
+
+
+class DockerApp(App):
+    __slots__ = ['image', 'container_name', 'docker_args', "app_args"]
+
+    def __init__(self, cluster, image, tag, configure_cb):
+        self.image = "{}:{}".format(image, tag)
+        self.docker_args = []
+        self.configure = configure_cb
+
+        self.container_name = 'trivup_{}_{}'\
+            .format(image.rsplit("/")[-1], str(uuid4())[0:7])
+
+        super(DockerApp, self).__init__(cluster, on='docker')
+
+    def start_cmd(self):
+        return " run -a stdout -a stderr " \
+               "{} --name {} {} {}"\
+                   .format(self.normalize_docker_opts(self.docker_args),
+                           self.container_name,
+                           self.normalize_app_props(self.configure()),
+                           self.image)
+
+    @staticmethod
+    def normalize_app_props(app_conf):
+        return " ".join("-e {}".format(str(prop)) for prop in app_conf)
+
+    @staticmethod
+    def normalize_docker_opts(docker_opts):
+        return " ".join(str(opt) for opt in docker_opts)
+
+    @staticmethod
+    def expose_port(docker_opts, docker, host):
+        docker_opts.append('-p {}:{}'.format(host, docker))
+
+    @staticmethod
+    def add_mount(docker_opts, docker, host):
+        docker_opts.append("--mount type=bind,source={},destination={}".format(
+            host, docker))
+
+    def _exec(self, *args):
+        cmd = [self.node.exec_cmd] + list(args)
+        self.dbg("Docker executing {}".format(str(cmd)))
+        try:
+            output = subprocess.check_output(cmd)
+        except subprocess.CalledProcessError as e:
+            self.log("Failed to execute: {}".format(output))
+            raise e
+
+    def stop(self, wait_term=True, force=False):
+        if self.state != 'started':
+            return
+
+        self.dbg('Stopping (container {})'.format(self.container_name))
+        try:
+            output = self._exec("stop", self.container_name)
+            self.state = "stopped"
+            self.dbg('Success: {}'.format(output))
+        except subprocess.CalledProcessError:
+            self.log("Failed to stop container: {}".format(output))
+            super(DockerApp, self).stop(wait_term, force)
+
+    def deploy(self):
+        self.dbg('Pulling docker image: {}'.format(self.image))
+        self._exec('pull', self.image)
+        pass
 
 
 if __name__ == '__main__':
