@@ -34,7 +34,7 @@ import os
 class ZookeeperApp (trivup.App):
     """ Zookeeper server app """
 
-    def __init__(self, cluster, conf=None, on=None, bin_path=None):
+    def __init__(self, cluster, conf=None, on='localhost', bin_path=None):
         """
         @param cluster     Current cluster
         @param on          Node name to run on

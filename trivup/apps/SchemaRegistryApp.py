@@ -41,15 +41,21 @@ class SchemaRegistryApp (trivup.DockerApp):
         Depends on KafkaBrokerApp.
         Requires docker. """
 
-    default_conf = {
+    default_version = '5.3.0'
+
+    default_app_conf = {
         'debug': True,
-        'host_name': 'localhost',
+        'host.name': 'localhost',
         'listeners': 'http://0.0.0.0:8081'
     }
 
-    default_version = '5.3.0'
+    @staticmethod
+    def _conf_to_env(app_conf):
+        return ["SCHEMA_REGISTRY_{}={}"
+                .format(key.replace(".", "_").upper(), value)
+                for key, value in app_conf.items()]
 
-    def __init__(self, cluster, conf=None, on='docker'):
+    def __init__(self, cluster, conf=None):
         """
         @param cluster     Current cluster
         @param conf        Configuration dict, see below.
@@ -57,74 +63,72 @@ class SchemaRegistryApp (trivup.DockerApp):
 
         Supported conf keys:
            * version - Confluent Platform version to use.
+           * enable_auth - Enable Http basic auth
            * port_base - Low TCP port base to start allocating from (random)
-           * conf - Confluent Schema Registry configs
+           * conf - Dictionary of Confluent Schema Registry configs
         """
+        print(conf.get('enable_auth'))
+        # Handle all docker specific after setting the context
+        super(SchemaRegistryApp, self).__init__(cluster,
+                                                sr_image,
+                                                conf.get('version',
+                                                         self.default_version),
+                                                conf)
 
-        app_conf = dict(self.default_conf, **conf.get('conf', {}))
-        # docker run options to be run on startup
-        docker_opts = []
+        protocol = 'http'
+        # Find available port on the host and expose it
+        port = trivup.TcpPortAllocator(cluster).next(
+            self, self.conf.get('port_base', None))
+        self.expose_port(self.docker_args, 8081, port)
 
-        version = conf.get('version', self.default_version)
+        app_conf = dict(self.default_app_conf, **conf.get('conf', {}))
 
         kafka = cluster.find_app(KafkaBrokerApp)
         if kafka:
-            app_conf['kafkastore_bootstrap_servers'] =\
+            app_conf['kafkastore.bootstrap.servers'] =\
                 kafka.conf.get('docker_advertised_listeners')
         else:
             raise Exception('KafkaBrokerApp required')
 
-        # Find available port on the host
-        port = trivup.TcpPortAllocator(cluster).next(
-            self, conf.get('port_base', None))
-
-        self.expose_port(docker_opts, 8081, port)
-
-        protocol = 'http'
         ssl = cluster.find_app(SslApp)
         if ssl is not None:
             # Mount SslApp dir, reuse broker trusts/certs
-            self.add_mount(docker_opts, "/ssl", ssl.root_path())
+            self.add_mount(self.docker_args, "/opt/ssl", ssl.root_path())
+            protocol = 'https'
+            app_conf.update({
+                'listeners': 'https://0.0.0.0:8081',
+                'inter_instance_protocol': 'https',
+                'ssl_keystore_location':
+                    '/opt/ssl/broker{}.keystore.jks'.format(kafka.appid),
+                'ssl_keystore_password': ssl.conf.get('ssl_key_pass'),
+                'ssl_key_password': ssl.conf.get('ssl_key_pass'),
+                'ssl_truststore_location':
+                    '/opt/ssl/broker{}.truststore.jks'.format(kafka.appid),
+                'ssl_truststore_password':  ssl.conf.get('ssl_key_pass')
+                })
 
-            protocol = "https"
-            app_conf['listeners'] = "https://0.0.0.0:8081"
-            app_conf['inter_instance_protocol'] = 'https'
+        if bool(self.conf.get('enable_auth', False)):
+            self.conf['userinfo'] = 'ckp_tester:test_secret'
+            app_conf.update({'authentication.method': 'BASIC',
+                             'authentication.realm': 'SchemaRegistry',
+                             'authentication.roles': 'Testers'})
+            app_conf['OPTS'] =\
+                '-Djava.security.auth.login.config=/opt/app/'\
+                'schema-registry.jaas'
 
-            app_conf['ssl_keystore_location'] =\
-                "/ssl/broker{}.keystore.jks".format(kafka.appid)
-            app_conf['ssl_keystore_password'] =\
-                ssl.conf.get('ssl_key_pass')
-            app_conf['ssl_key_password'] =\
-                ssl.conf.get('ssl_key_pass')
+        if bool(self.conf.get('enable_auth', False)):
+            self.conf['userinfo'] = 'ckp_tester:test_secret'
+            self.add_mount(self.docker_args, "/opt/app", self.root_path())
+            self.create_file_from_template('login.properties')
+            self.create_file_from_template('schema-registry.jaas', subst=False)
 
-            app_conf['ssl_truststore_location'] =\
-                "/ssl/broker{}.truststore.jks".format(kafka.appid)
-            app_conf['ssl_truststore_password'] =\
-                ssl.conf.get('ssl_key_pass')
+        self.conf['url'] = '{}://{}@localhost:{}'.format(
+                protocol,
+                self.conf.get('userinfo', ''),
+                port)
 
-        # Capture app_conf state for use on startup
-        def configure():
-            return ["SCHEMA_REGISTRY_{}={}".format(key.upper(), value)
-                    for key, value in app_conf.items()]
-
-        # Handle all docker specific after setting the context
-        super(SchemaRegistryApp, self).__init__(cluster,
-                                                sr_image,
-                                                version,
-                                                configure)
-
-        # if ssl is not None:
-        #     self.docker_args.append("--mount type=bind,source={},"
-        #                             "destination=/ssl".format(
-        #                                 ssl.root_path()))
-
-
-        # self.docker_args.append('-p {}:8081'.format(port))
-
-        self.docker_args = docker_opts
-        # This is the listener address outside the docker container,
-        # using port-forwarding
-        self.conf['url'] = '{}://localhost:{}'.format(protocol, port)
+        # format configs for use by docker
+        self.app_args = self._conf_to_env(app_conf)
 
     def operational(self):
         self.dbg('Checking if %s is operational' % self.get('url'))

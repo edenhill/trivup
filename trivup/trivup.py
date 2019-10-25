@@ -648,30 +648,31 @@ class App (object):
 class DockerApp(App):
     __slots__ = ['image', 'container_name', 'docker_args', "app_args"]
 
-    def __init__(self, cluster, image, tag, configure_cb):
+    def __init__(self, cluster, image, tag, conf):
         self.image = "{}:{}".format(image, tag)
+        self.conf = conf
         self.docker_args = []
-        self.configure = configure_cb
-
+        self.app_args = []
         self.container_name = 'trivup_{}_{}'\
             .format(image.rsplit("/")[-1], str(uuid4())[0:7])
 
-        super(DockerApp, self).__init__(cluster, on='docker')
+        super(DockerApp, self).__init__(cluster, conf=conf, on='docker')
 
     def start_cmd(self):
         return " run -a stdout -a stderr " \
                "{} --name {} {} {}"\
-                   .format(self.normalize_docker_opts(self.docker_args),
+                   .format(self._docker_opts_to_list(self.docker_args),
                            self.container_name,
-                           self.normalize_app_props(self.configure()),
+                           self._dockerize_app_props(self.app_args),
                            self.image)
 
     @staticmethod
-    def normalize_app_props(app_conf):
-        return " ".join("-e {}".format(str(prop)) for prop in app_conf)
+    def _dockerize_app_props(app_conf):
+        return " ".join("-e {}".format(str(prop))
+                        for prop in app_conf)
 
     @staticmethod
-    def normalize_docker_opts(docker_opts):
+    def _docker_opts_to_list(docker_opts):
         return " ".join(str(opt) for opt in docker_opts)
 
     @staticmethod

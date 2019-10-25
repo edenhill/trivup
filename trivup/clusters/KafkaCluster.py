@@ -78,6 +78,8 @@ class KafkaCluster(object):
         'with_ssl': False,
         # With SchemaRegistry
         'with_sr': False,
+        # With SchemaRegistry Auth
+        'with_sr_auth': False,
         # Debug trivup
         'debug': False,
         # Additional broker server.properties configuration
@@ -158,9 +160,12 @@ class KafkaCluster(object):
         # Create SchemaRegistry if enabled
         if bool(self.conf.get('with_sr', False)):
             self.sr = SchemaRegistryApp(
-                self.cluster, {'version': self.conf.get('cp_version')})
+                self.cluster, {'version': self.conf.get('cp_version'),
+                               'enable_auth': self.conf.get('with_sr_auth')})
             self.env['SR_URL'] = self.sr.get('url')
 
+        if bool(self.conf.get('with_sr_auth')):
+            self.env['SR_USERINFO'] = self.sr.get('userinfo')
         # Create librdkafka client configuration
         self._setup_client_conf()
 
@@ -411,6 +416,9 @@ if __name__ == '__main__':
     parser.add_argument('--sr', dest='sr', action='store_true',
                         default=KafkaCluster.default_conf['with_sr'],
                         help='Enable SchemaRegistry')
+    parser.add_argument('--sr_auth', dest='sr_auth', action='store_true',
+                        default=KafkaCluster.default_conf['with_sr_auth'],
+                        help='Enable SchemaRegistry HTTP Basic auth')
     parser.add_argument('--brokers', dest='broker_cnt', type=int,
                         default=KafkaCluster.default_conf['broker_cnt'],
                         help='Number of Kafka brokers')
@@ -427,8 +435,10 @@ if __name__ == '__main__':
             'sasl_mechanism': args.sasl,
             'with_ssl': args.ssl,
             'with_sr': args.sr,
+            'with_sr_auth': args.sr_auth,
             'broker_cnt': args.broker_cnt}
 
+    print("cluster conf {}", conf)
     kc = KafkaCluster(**conf)
 
     kc.interactive(args.cmd)

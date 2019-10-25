@@ -36,7 +36,7 @@ class SslApp (trivup.App):
     """ Generates SSL certificates for use by other apps.
         This is not a running app but simply provides helper methods
         to generate certificates, etc. """
-    def __init__(self, cluster, conf=None, on=None):
+    def __init__(self, cluster, conf=None, on='localhost'):
         """
         @param cluster     Current cluster
         @param conf        Configuration dict, see below.
