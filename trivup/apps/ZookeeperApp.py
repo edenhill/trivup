@@ -67,7 +67,7 @@ class ZookeeperApp (trivup.App):
 
     def operational(self):
         self.dbg('Checking if operational')
-        return os.system(('(echo stat | nc %s | grep -q Zookeeper.version) '
+        return os.system(('(echo srvr | nc %s | grep -q Zookeeper.version) '
                           '2>/dev/null') %
                          ' '.join(self.get('address').split(':'))) == 0
 
