@@ -411,7 +411,7 @@ class App (object):
         else:
             rendered = filedata.decode('ascii')
         if append_data is not None:
-            rendered += '\n' + append_data
+            rendered += '\n' + append_data + '\n'
         return self.create_file(relpath, unique, data=rendered,
                                 pathtype=pathtype)
 
