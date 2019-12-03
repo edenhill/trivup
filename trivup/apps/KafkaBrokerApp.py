@@ -129,10 +129,17 @@ class KafkaBrokerApp (trivup.App):
             if len(sasl_mechs) > 0:
                 listeners.append('SASL_SSL')
 
-        # Map DOCKER listener to PLAINTEXT security protocol
-        conf_blob.append('listener.security.protocol.map=' +
-                         'PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_PLAINTEXT:' +
-                         'SASL_PLAINTEXT,SASL_SSL:SASL_SSL,DOCKER:PLAINTEXT')
+        listener_map = 'listener.security.protocol.map=' + \
+            'PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_PLAINTEXT:' + \
+            'SASL_PLAINTEXT,SASL_SSL:SASL_SSL'
+
+        can_docker = self.conf['version'] == 'trunk' or \
+            int(self.conf['version'].split('.')[0]) > 0
+        if can_docker:
+            # Map DOCKER listener to PLAINTEXT security protocol
+            listener_map += ',DOCKER:PLAINTEXT'
+
+        conf_blob.append(listener_map)
 
         # Create listeners
         ports = [(x, trivup.TcpPortAllocator(self.cluster).next(
@@ -140,24 +147,27 @@ class KafkaBrokerApp (trivup.App):
                  for x in sorted(set(listeners))]
         self.conf['port'] = ports[0][1]  # "Default" port
 
-        # Add docker listener to allow services (e.g, SchemaRegistry) in
-        # docker-containers to reach the on-host Kafka.
-        docker_port = trivup.TcpPortAllocator(self.cluster).next(self)
-        docker_host = '%s:%d' % (cluster.get_docker_host(), docker_port)
+        if can_docker:
+            # Add docker listener to allow services (e.g, SchemaRegistry) in
+            # docker-containers to reach the on-host Kafka.
+            docker_port = trivup.TcpPortAllocator(self.cluster).next(self)
+            docker_host = '%s:%d' % (cluster.get_docker_host(), docker_port)
 
         self.conf['address'] = '%s:%d' % (listener_host, self.conf['port'])
         listeners = ['%s://%s:%d' % (x[0], "0.0.0.0", x[1]) for x in ports]
-        listeners.append('%s://%s:%d' % ('DOCKER', "0.0.0.0", docker_port))
+        if can_docker:
+            listeners.append('%s://%s:%d' % ('DOCKER', "0.0.0.0", docker_port))
         self.conf['listeners'] = ','.join(listeners)
         if 'advertised_hostname' not in self.conf:
             self.conf['advertised_hostname'] = self.conf['nodename']
         advertised_listeners = ['%s://%s:%d' %
                                 (x[0], self.conf['advertised_hostname'], x[1])
                                 for x in ports]
-        # Expose service to docker containers as well.
-        advertised_listeners.append('DOCKER://%s' % docker_host)
-        self.conf['docker_advertised_listeners'] = 'PLAINTEXT://%s' % \
-                                                   docker_host
+        if can_docker:
+            # Expose service to docker containers as well.
+            advertised_listeners.append('DOCKER://%s' % docker_host)
+            self.conf['docker_advertised_listeners'] = 'PLAINTEXT://%s' % \
+                docker_host
         self.conf['advertised.listeners'] = ','.join(advertised_listeners)
         self.conf['advertised_listeners'] = self.conf['advertised.listeners']
         self.conf['auto_create_topics'] = self.conf.get('auto_create_topics',
