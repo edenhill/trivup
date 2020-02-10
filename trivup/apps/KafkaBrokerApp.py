@@ -86,6 +86,8 @@ class KafkaBrokerApp (trivup.App):
 
         listener_host = self.conf.get('listener_host',
                                       self.conf.get('nodename'))
+        self.conf['listener_host'] = listener_host
+
         # Kafka Configuration properties
         self.conf['log_dirs'] = self.create_dir('logs')
         if 'num_partitions' not in self.conf:
@@ -292,6 +294,13 @@ class KafkaBrokerApp (trivup.App):
                              ssl.conf.get('ssl_key_pass'))
             conf_blob.append('ssl.client.auth = %s' %
                              self.conf.get('ssl_client_auth', 'required'))
+
+        # Enable JMX
+        jmx_port = trivup.TcpPortAllocator(self.cluster).next(self)
+        # FIXME: JmxTool does not work when JMX is bound to listener_host,
+        #        so we unfortunately can't bind to listener_host here.
+        self.conf['jmx_port'] = jmx_port
+        self.env_add('JMX_PORT', str(jmx_port))
 
         # Generate config file
         self.conf['conf_file'] = self.create_file_from_template('server.properties',  # noqa: E501
