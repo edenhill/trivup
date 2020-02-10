@@ -271,7 +271,8 @@ class KafkaBrokerApp (trivup.App):
             self.env_add('KAFKA_OPTS',
                          '-Djava.security.auth.login.config=%s' %
                          self.conf['jaas_file'])
-            self.env_add('KAFKA_OPTS', '-Djava.security.debug=all')
+            if self.cluster.debug:
+                self.env_add('KAFKA_OPTS', '-Djava.security.debug=all')
 
         # SSL config and keys (et.al.)
         if ssl is not None:
