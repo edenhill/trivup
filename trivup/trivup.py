@@ -483,12 +483,18 @@ class App (object):
         return proc
 
     def run(self):
-        """ Run application using conf @param start_cmd """
+        """ Run application using conf @param start_cmd.
+            @returns true if app was started, or false if no start_cmd """
+        start_cmd = self.start_cmd()
+        if start_cmd is None:
+            return False
+
         self.stdout_fd = open(self.mkpath('stdout.log', pathtype='log'), 'a')
         self.stderr_fd = open(self.mkpath('stderr.log', pathtype='log'), 'a')
-        self.proc = self.execute(self.start_cmd(),
+        self.proc = self.execute(start_cmd,
                                  stdout_fd=self.stdout_fd,
                                  stderr_fd=self.stderr_fd)
+        return True
 
     def run_post_cmds(self):
         """
@@ -513,12 +519,10 @@ class App (object):
     def start(self):
         if self.state == 'started':
             raise Exception('%s already started' % self.name)
-        elif self.start_cmd() is None:
-            return
 
-        self.run()
-        self.state = 'started'
-        self.t_started = time.time()
+        if self.run():
+            self.state = 'started'
+            self.t_started = time.time()
 
     def pid(self):
         if self.proc is None:
