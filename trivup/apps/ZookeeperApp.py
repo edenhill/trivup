@@ -42,11 +42,14 @@ class ZookeeperApp (trivup.App):
         Config:
           bindir    Path to zookeeper-server-start.sh directory (optional)
                     Falls back to Kafka bindir
+          zk_port   Port at which Zookeeper should be bound (optional)
+                    A (random) free port will be chosen otherwise
 
         Exposes 'address' (host:port) for other apps.
         """
         super(ZookeeperApp, self).__init__(cluster, conf=conf, on=on)
-        self.conf['port'] = trivup.TcpPortAllocator(self.cluster).next(self)
+        self.conf['port'] = trivup.TcpPortAllocator(self.cluster).next(self, 
+                                                                       port_base=self.conf.get('zk_port', None))
         self.conf['datadir'] = self.create_dir('datadir')
         self.conf['address'] = '%(nodename)s:%(port)d' % self.conf
         # Generate config file
