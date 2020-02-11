@@ -42,6 +42,8 @@ class ZookeeperApp (trivup.App):
         Config:
           bindir    Path to zookeeper-server-start.sh directory (optional)
                     Falls back to Kafka bindir
+          zk_port   Port at which Zookeeper should be bound (optional)
+                    A (random) free port will be chosen otherwise
 
         Exposes 'address' (host:port) for other apps.
         """
