@@ -13,3 +13,5 @@ delete.topic.enable=true
 default.replication.factor=${replication_factor}
 offsets.topic.replication.factor=${replication_factor}
 security.inter.broker.protocol=PLAINTEXT
+allow.everyone.if.no.acl.found=true
+authorizer.class.name=kafka.security.auth.SimpleAclAuthorizer
