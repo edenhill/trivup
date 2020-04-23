@@ -40,7 +40,7 @@ import time
 class KafkaBrokerApp (trivup.App):
     """ Kafka broker app
         Depends on ZookeeperApp """
-    def __init__(self, cluster, conf=None, on=None):
+    def __init__(self, cluster, conf=None, on='localhost'):
         """
         @param cluster     Current cluster
         @param conf        Configuration dict, see below.
