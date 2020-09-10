@@ -63,6 +63,7 @@ class KafkaBrokerApp (trivup.App):
            * sasl_users - CSV list of SASL PLAIN/SCRAM of user=pass for
                           authenticating clients
            * ssl_client_auth - ssl.client.auth broker property (def: required)
+           * auto_create_topics - Enable topic auto-creation (true)
            * num_partitions - Topic auto-create partition count (3)
            * replication_Factor - Topic auto-create replication factor (1)
            * port_base - Low TCP port base to start allocating from (random)
