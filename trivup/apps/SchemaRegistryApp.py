@@ -39,7 +39,7 @@ class SchemaRegistryApp (trivup.App):
         Depends on KafkaBrokerApp.
         Requires docker. """
 
-    default_image = 'confluentinc/cp-schema-registry:5.2.1'
+    default_image = 'confluentinc/cp-schema-registry:latest'
 
     def __init__(self, cluster, conf=None, on=None):
         """
