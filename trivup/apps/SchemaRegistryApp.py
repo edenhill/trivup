@@ -39,7 +39,8 @@ class SchemaRegistryApp (trivup.App):
         Depends on KafkaBrokerApp.
         Requires docker. """
 
-    default_image = 'confluentinc/cp-schema-registry:latest'
+    default_image = 'confluentinc/cp-schema-registry'
+    default_version = 'latest'
 
     def __init__(self, cluster, conf=None, on=None):
         """
@@ -56,7 +57,9 @@ class SchemaRegistryApp (trivup.App):
         super(SchemaRegistryApp, self).__init__(cluster, conf=conf, on=on)
 
         if self.conf.get('image', '') == '':
-            self.conf['image'] = self.default_image
+            self.conf['image'] = '{}:{}'.format(
+                self.default_image,
+                self.conf.get('version', self.default_version))
 
         self.conf['container_id'] = 'trivup_sr_%s' % str(uuid.uuid4())[0:7]
         kafka = cluster.find_app(KafkaBrokerApp)
