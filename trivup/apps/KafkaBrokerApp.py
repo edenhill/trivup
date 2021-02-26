@@ -67,6 +67,7 @@ class KafkaBrokerApp (trivup.App):
            * num_partitions - Topic auto-create partition count (3)
            * replication_Factor - Topic auto-create replication factor (1)
            * port_base - Low TCP port base to start allocating from (random)
+           * port - Alias for port_base
            * kafka_path - Path to Kafka build tree (for trunk usage)
            * fdlimit - RLIMIT_NOFILE (or "max") (default: max)
            * conf - arbitary server.properties config as a list of strings.
@@ -146,7 +147,7 @@ class KafkaBrokerApp (trivup.App):
 
         # Create listeners
         ports = [(x, trivup.TcpPortAllocator(self.cluster).next(
-            self, self.conf.get('port_base', None)))
+            self, self.conf.get('port_base', self.conf.get('port', None))))
                  for x in sorted(set(listeners))]
         self.conf['port'] = ports[0][1]  # "Default" port
 
