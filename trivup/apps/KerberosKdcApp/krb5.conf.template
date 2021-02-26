@@ -7,6 +7,8 @@ dns_lookup_realm = false
 forwardable = true
 renew_lifetime = ${renew_lifetime}
 ticket_lifetime = ${ticket_lifetime}
+# Required by krb5 >= 1.17
+spake_preauth_groups = edwards25519
 
 [realms]
 ${realm} = {
