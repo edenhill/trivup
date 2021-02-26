@@ -66,8 +66,8 @@ class KafkaCluster(object):
     # conf dict structure with defaults:
     # commented-out fields are not defaults but show what is available.
     default_conf = {
-        'version': '2.2.0',     # Apache Kafka version
-        'cp_version': '5.2.1',  # Confluent Platform version (for SR)
+        'version': '2.7.0',     # Apache Kafka version
+        'cp_version': '6.0.0',  # Confluent Platform version (for SR)
         'broker_cnt': 3,
         'sasl_mechanism': '',   # GSSAPI, PLAIN, SCRAM-.., ...
         'realm_cnt': 1,
