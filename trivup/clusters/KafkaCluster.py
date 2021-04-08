@@ -67,7 +67,7 @@ class KafkaCluster(object):
     # commented-out fields are not defaults but show what is available.
     default_conf = {
         'version': '2.7.0',     # Apache Kafka version
-        'cp_version': '6.0.0',  # Confluent Platform version (for SR)
+        'cp_version': '6.1.0',  # Confluent Platform version (for SR)
         'broker_cnt': 3,
         'sasl_mechanism': '',   # GSSAPI, PLAIN, SCRAM-.., ...
         'realm_cnt': 1,
@@ -417,6 +417,9 @@ if __name__ == '__main__':
     parser.add_argument('--version', dest='version', type=str,
                         default=KafkaCluster.default_conf['version'],
                         help='Apache Kafka version')
+    parser.add_argument('--cpversion', dest='cp_version', type=str,
+                        default=KafkaCluster.default_conf['cp_version'],
+                        help='Confluent Platform version (for Schema-Registry)')
     parser.add_argument('--cmd', type=str, dest='cmd', default=None,
                         help='Command to execute instead of interactive shell')
 
@@ -424,6 +427,7 @@ if __name__ == '__main__':
 
     conf = {'debug': args.debug,
             'version': args.version,
+            'cp_version': args.cp_version,
             'sasl_mechanism': args.sasl,
             'with_ssl': args.ssl,
             'with_sr': args.sr,

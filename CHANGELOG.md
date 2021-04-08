@@ -1,3 +1,8 @@
+# 0.8.4
+
+ * KafkaCluster: Bump Confluent Platform to 6.1.0
+ * KafkaCluster: add --cpversion argument
+
 # 0.8.3
 
  * Bump Apache Kafka to 2.7.0
