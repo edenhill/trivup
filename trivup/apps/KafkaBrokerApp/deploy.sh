@@ -53,11 +53,6 @@ function kafka_build {
     popd >> $LOGFILE
 
     echo "### $0: Succesfully built $VERSION"
-
-    # Create a link from DEST_DIR to git tree
-    ln -sf "$KAFKA_DIR" "$DEST_DIR"
-
-    echo "### $0: Deployed Kafka $VERSION to $DEST_DIR (symlink to $KAFKA_DIR)"
 }
 
 function kafka_git_clone {
@@ -68,11 +63,17 @@ function kafka_git_clone {
 
 if [[ $VERSION == 'trunk' ]]; then
     if [[ ! -f "$KAFKA_DIR/README.md" ]]; then
-	# No Kafka sources, check them out.
 	kafka_git_clone
+        kafka_build
+
+    else
+        echo "### $0: Kafka source directory $KAFKA_DIR exists: assuming Kafka is built"
     fi
 
-    kafka_build
+    # Create a link from DEST_DIR to git tree
+    ln -sf "$KAFKA_DIR" "$DEST_DIR"
+
+    echo "### $0: Deployed Kafka $VERSION to $DEST_DIR (symlink to $KAFKA_DIR)"
 
 else
 

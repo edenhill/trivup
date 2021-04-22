@@ -31,6 +31,7 @@ import os
 import signal
 from string import Template
 from uuid import uuid4
+from base64 import urlsafe_b64encode
 from copy import deepcopy
 from collections import defaultdict
 import subprocess
@@ -49,6 +50,10 @@ class Cluster (object):
         super(Cluster, self).__init__()
         self.debug = debug
         self.name = name
+        # Generate a uuid for this cluster, may be used as see fit by Apps.
+        # The uuid is Base64-encoded (without padding) to match the
+        # Kafka randomUuid format.
+        self.uuid = urlsafe_b64encode(uuid4().bytes).decode('utf-8').strip('=')
         self.instance = str(int(time.time()))[2:]
         self.nodes = dict()
         for n in nodes:
@@ -226,7 +231,7 @@ class Allocator (object):
         super(Allocator, self).__init__()
         self.cluster = cluster
 
-    def next(self, app):
+    def next(self, app=None):
         appid = self.cluster.appid_next
         self.cluster.appid_next += 1
         return appid

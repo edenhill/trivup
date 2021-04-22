@@ -37,7 +37,7 @@
 #
 # cluster.env (dict) will contain:
 #      TRIVUP_ROOT
-#      ZK_ADDRESS
+#      ZK_ADDRESS  (unless --kraft)
 #      BROKERS
 #      BROKER_PID_<nodeid>
 #      KAFKA_PATH  (path to kafka package root directory)
@@ -48,7 +48,7 @@
 #
 # See conf dict structure below.
 
-from trivup.trivup import Cluster, TcpPortAllocator
+from trivup.trivup import Cluster, Allocator, TcpPortAllocator
 from trivup.apps.ZookeeperApp import ZookeeperApp
 from trivup.apps.KafkaBrokerApp import KafkaBrokerApp
 from trivup.apps.KerberosKdcApp import KerberosKdcApp
@@ -66,13 +66,15 @@ class KafkaCluster(object):
     # conf dict structure with defaults:
     # commented-out fields are not defaults but show what is available.
     default_conf = {
-        'version': '2.7.0',     # Apache Kafka version
+        'version': '2.8.0',     # Apache Kafka version
         'cp_version': '6.1.0',  # Confluent Platform version (for SR)
         'broker_cnt': 3,
         'sasl_mechanism': '',   # GSSAPI, PLAIN, SCRAM-.., ...
         'realm_cnt': 1,
         'krb_renew_lifetime': 30,
         'krb_ticket_lifetime': 120,
+        # KRaft (No zookeeper). Requires AK >=2.8
+        'kraft': False,
         # SASL PLAIN/SCRAM
         'sasl_users': 'testuser=testpass',
         # With SSL
@@ -96,6 +98,7 @@ class KafkaCluster(object):
             self.conf.update(conf)
 
         self.version = self.conf.get('version')
+        self.kraft = self.conf.get('kraft')
 
         # Create trivup Cluster
         self.cluster = Cluster(
@@ -122,8 +125,14 @@ class KafkaCluster(object):
                                       (bool(self.sasl_mechanism),
                                        bool(self.ssl is not None))]
 
-        # Create single ZK for the cluster (don't start yet')
-        self.zk = ZookeeperApp(self.cluster)
+        if not self.kraft:
+            # Create single ZK for the cluster (don't start yet)
+            self.zk = ZookeeperApp(self.cluster)
+        else:
+            self.zk = None
+            # Allocate (but don't use) a dummy appid so that the brokers get
+            # the same appid/nodeid for both KRaft and ZK modes.
+            Allocator(self.cluster).next()
 
         # Broker configuration
         broker_cnt = int(self.conf.get('broker_cnt'))
@@ -132,13 +141,15 @@ class KafkaCluster(object):
                             'version': self.version,
                             'sasl_mechanisms': self.sasl_mechanism,
                             'sasl_users': self.conf.get('sasl_users'),
-                            'conf': self.conf.get('broker_conf', [])}
+                            'conf': self.conf.get('broker_conf', []),
+                            'kafka_path': self.conf.get('kafka_path', None)}
 
         # Start Kerberos KDCs if GSSAPI (Kerberos) is configured
         if self.sasl_mechanism == 'GSSAPI':
             self._setup_kerberos()
             self.broker_conf['realm'] = self.broker_realm
 
+        self.broker_conf['listener_host'] = 'localhost'
         # Create brokers (don't start yet)
         self.brokers = dict()
         for n in range(0, broker_cnt):
@@ -177,7 +188,8 @@ class KafkaCluster(object):
     def _setup_env(self):
         """ Set up convenience envs """
         self.env['KAFKA_PATH'] = self.cluster.find_app(KafkaBrokerApp).get('destdir')  # noqa: E501
-        self.env['ZK_ADDRESS'] = self.zk.get('address')
+        if not self.kraft:
+            self.env['ZK_ADDRESS'] = self.zk.get('address')
         self.env['BROKERS'] = self.bootstrap_servers
         self.env['KAFKA_VERSION'] = self.version
         self.env['TRIVUP_ROOT'] = self.cluster.instance_path()
@@ -401,6 +413,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Trivup KafkaCluster')
     parser.add_argument('--debug', action='store_true', dest='debug',
                         default=False, help='Enable trivup debugging')
+    parser.add_argument('--kraft', dest='kraft', action='store_true',
+                        default=KafkaCluster.default_conf['kraft'],
+                        help='KRaft mode (no Zookeeper). Requires >= AK 2.8')
     parser.add_argument('--sasl', dest='sasl', type=str,
                         default=KafkaCluster.default_conf['sasl_mechanism'],
                         help='SASL mechanism (PLAIN, SCRAM-SHA-nnn, GSSAPI, ' +
@@ -419,19 +434,26 @@ if __name__ == '__main__':
                         help='Apache Kafka version')
     parser.add_argument('--cpversion', dest='cp_version', type=str,
                         default=KafkaCluster.default_conf['cp_version'],
-                        help='Confluent Platform version (for Schema-Registry)')
+                        help='Confluent Platform version (for Schema-Registry)')  # noqa: E501
     parser.add_argument('--cmd', type=str, dest='cmd', default=None,
                         help='Command to execute instead of interactive shell')
+    parser.add_argument('--kafka-src', dest='kafka_src', type=str,
+                        default=None,
+                        help='Existing Kafka source directory to use ' +
+                        'instead of downloaded release. ' +
+                        'Requires --version trunk.')
 
     args = parser.parse_args()
 
     conf = {'debug': args.debug,
+            'kraft': args.kraft,
             'version': args.version,
             'cp_version': args.cp_version,
             'sasl_mechanism': args.sasl,
             'with_ssl': args.ssl,
             'with_sr': args.sr,
-            'broker_cnt': args.broker_cnt}
+            'broker_cnt': args.broker_cnt,
+            'kafka_path': args.kafka_src}
 
     kc = KafkaCluster(**conf)
 

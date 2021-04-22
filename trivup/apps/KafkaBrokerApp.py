@@ -39,7 +39,7 @@ import time
 
 class KafkaBrokerApp (trivup.App):
     """ Kafka broker app
-        Depends on ZookeeperApp """
+        Depends on ZookeeperApp (unless KRaft mode) """
     def __init__(self, cluster, conf=None, on=None):
         """
         @param cluster     Current cluster
@@ -75,13 +75,24 @@ class KafkaBrokerApp (trivup.App):
         """
         super(KafkaBrokerApp, self).__init__(cluster, conf=conf, on=on)
 
-        self.zk = cluster.find_app('ZookeeperApp')
-        if self.zk is None:
-            raise Exception('ZookeeperApp required')
-
         # Kafka repo uses SVN nomenclature
         if self.conf['version'] == 'master':
             self.conf['version'] = 'trunk'
+
+        if self.conf['version'] == 'trunk':
+            self.version = [9, 9, 9]
+        else:
+            self.version = [int(x) for x in
+                            self.conf['version'].split('.')][:3]
+
+        self.zk = cluster.find_app('ZookeeperApp')
+        if self.zk is None:
+            # If AK >=2.8 we can run in KRaft-mode without ZK
+            if self.version < [2, 8, 0]:
+                raise Exception('ZookeeperApp or AK >=2.8 required')
+            self.kraft = True
+        else:
+            self.kraft = False
 
         if 'fdlimit' not in self.conf:
             self.conf['fdlimit'] = 'max'
@@ -94,7 +105,10 @@ class KafkaBrokerApp (trivup.App):
         self.conf['log_dirs'] = self.create_dir('logs')
         if 'num_partitions' not in self.conf:
             self.conf['num_partitions'] = 3
-        self.conf['zk_connect'] = self.zk.get('address', None)
+
+        if self.zk is not None:
+            self.conf['zk_connect'] = self.zk.get('address', None)
+
         if 'replication_factor' not in self.conf:
             self.conf['replication_factor'] = 1
 
@@ -115,23 +129,31 @@ class KafkaBrokerApp (trivup.App):
         jaas_blob = list()
 
         #
-        # Configure listeners, SSL and SASL
+        # Configure listener types, SSL and SASL, CONTROLLER, etc.
         #
-        listeners = self.conf.get('listeners', 'PLAINTEXT').split(',')
+        listener_types = self.conf.get('listeners', 'PLAINTEXT').split(',')
+
+        if self.kraft:
+            conf_blob.append('process.roles=broker,controller')
+            conf_blob.append('controller.listener.names=CONTROLLER')
+            listener_types.append('CONTROLLER')
+        else:
+            conf_blob.append('zookeeper.connect={}'.format(
+                self.conf.get('zk_connect')))
 
         # SASL support
         sasl_mechs = [x for x in self.conf.get('sasl_mechanisms', '').
                       replace(' ', '').split(',') if len(x) > 0]
         if len(sasl_mechs) > 0:
-            listeners.append('SASL_PLAINTEXT')
+            listener_types.append('SASL_PLAINTEXT')
 
         # SSL support
         ssl = cluster.find_app(SslApp)
         if ssl is not None:
-            # Add SSL listeners
-            listeners.append('SSL')
+            # Add SSL listener_types
+            listener_types.append('SSL')
             if len(sasl_mechs) > 0:
-                listeners.append('SASL_SSL')
+                listener_types.append('SASL_SSL')
 
         listener_map = 'listener.security.protocol.map=' + \
             'PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_PLAINTEXT:' + \
@@ -143,12 +165,23 @@ class KafkaBrokerApp (trivup.App):
             # Map DOCKER listener to PLAINTEXT security protocol
             listener_map += ',DOCKER:PLAINTEXT'
 
+        if self.kraft:
+            listener_map += ',CONTROLLER:PLAINTEXT'
+
         conf_blob.append(listener_map)
 
-        # Create listeners
+        def sort_listener(a):
+            """ Sort listener_types list so that the PLAINTEXTs are first,
+                since the first listener is used by operational(). """
+            if a.startswith('PLAINTEXT'):
+                return 0
+            else:
+                return 1
+
+        # Allocate a port for each listener type
         ports = [(x, trivup.TcpPortAllocator(self.cluster).next(
             self, self.conf.get('port_base', self.conf.get('port', None))))
-                 for x in sorted(set(listeners))]
+                 for x in sorted(set(listener_types), key=sort_listener)]
         self.conf['port'] = ports[0][1]  # "Default" port
 
         if can_docker:
@@ -158,6 +191,7 @@ class KafkaBrokerApp (trivup.App):
             docker_host = '%s:%d' % (cluster.get_docker_host(), docker_port)
 
         self.conf['address'] = '%s:%d' % (listener_host, self.conf['port'])
+        # Create a listener for each port
         listeners = ['%s://%s:%d' % (x[0], "0.0.0.0", x[1]) for x in ports]
         if can_docker:
             listeners.append('%s://%s:%d' % ('DOCKER', "0.0.0.0", docker_port))
@@ -166,7 +200,7 @@ class KafkaBrokerApp (trivup.App):
             self.conf['advertised_hostname'] = self.conf['nodename']
         advertised_listeners = ['%s://%s:%d' %
                                 (x[0], self.conf['advertised_hostname'], x[1])
-                                for x in ports]
+                                for x in ports if x[0] != 'CONTROLLER']
         if can_docker:
             # Expose service to docker containers as well.
             advertised_listeners.append('DOCKER://%s' % docker_host)
@@ -174,11 +208,23 @@ class KafkaBrokerApp (trivup.App):
                 docker_host
         self.conf['advertised.listeners'] = ','.join(advertised_listeners)
         self.conf['advertised_listeners'] = self.conf['advertised.listeners']
+        if self.kraft:
+            self.conf['controller_listener'] = \
+                [x for x in listeners if x.startswith('CONTROLLER://')][0]
+
         self.conf['auto_create_topics'] = self.conf.get('auto_create_topics',
                                                         'true')
         self.dbg('Listeners: %s' % self.conf['listeners'])
         self.dbg('Advertised Listeners: %s' %
                  self.conf['advertised.listeners'])
+
+        if not self.kraft:
+            conf_blob.append('zookeeper.connect={}'.format(
+                self.conf['zk_connect']))
+
+            # SimpleAclAuthorizer doesn't work with KRaft, for some reason.
+            # Will investigate later.
+            conf_blob.append('authorizer.class.name=kafka.security.auth.SimpleAclAuthorizer')   # noqa: E501
 
         if len(sasl_mechs) > 0:
             self.dbg('SASL mechanisms: %s' % sasl_mechs)
@@ -210,15 +256,15 @@ class KafkaBrokerApp (trivup.App):
                         elif plugin == 'scram.Scram':
                             jaas_blob.append('  username="%s" password="%s"' %
                                              (u, p))
-                            # SCRAM users are set up in ZK
-                            # with kafka-configs.sh
+                            # SCRAM users are set up using kafka-configs.sh
                             self.post_start_cmds.append((
-                                '%s --zookeeper %s --alter --add-config '
+                                '%s --bootstrap-server %s '
+                                '--alter --add-config '
                                 '\'%s=[iterations=4096,password=%s]\' '
-                                '--entity-type users --entity-name \'%s\'') %
-                                                        (kafka_configs_sh,
-                                                         self.conf['zk_connect'],  # noqa: E501
-                                                         mech, p, u))
+                                '--entity-type users --entity-name \'%s\'') % (
+                                    kafka_configs_sh,
+                                    self.conf['advertised_listeners'],
+                                    mech, p, u))
 
                     jaas_blob[-1] += ';'
 
@@ -332,6 +378,40 @@ class KafkaBrokerApp (trivup.App):
                                               socket.SOCK_STREAM)) as s:
             return s.connect_ex((addr, int(port))) == 0
 
+    def kraft_setup_storage(self):
+        """ Set up KRaft storage """
+        cmd = '{}/kafka-storage.sh format -t {} -c {}'.format(
+            self.conf['bindir'],
+            self.cluster.uuid,
+            self.conf['conf_file'])
+        self.dbg('KRaft: setting up storage with: {}'.format(cmd))
+        r = os.system(cmd)
+        if r != 0:
+            raise Exception('KRaft setup failed: "%s" returned exit code %d' %
+                            (cmd, r))
+
+    def kraft_configure_controllers(self):
+        """ Configure the KRaft controllers.
+        Needs to be performed in the deploy stage when all KafkaBrokerApps have
+        been instantiated. """
+
+        # Find all controllers (all KafkaBrokerApps for now) and construct
+        # a list of broker_id@host:port.
+        controllers = [
+            '{}@{}'.format(
+                x.appid, x.conf['controller_listener'].split('://')[-1])
+            for x in self.cluster.find_apps(self.__class__)]
+
+        self.dbg('KRaft: controllers: {}'.format(controllers))
+        with open(self.conf['conf_file'], 'a') as f:
+            f.write('controller.quorum.voters={}\n'.format(
+                ','.join(controllers)))
+
+    def kraft_setup(self):
+        """ Set up KRaft. Should be called from deploy(). """
+        self.kraft_configure_controllers()
+        self.kraft_setup_storage()
+
     def deploy(self):
         destdir = os.path.join(self.cluster.mkpath(self.__class__.__name__),
                                'kafka', self.get('version'))
@@ -345,6 +425,7 @@ class KafkaBrokerApp (trivup.App):
         cmd = '%s %s "%s" "%s"' % \
               (deploy_exec, self.get('version'),
                self.get('kafka_path', destdir), destdir)
+        self.dbg('Deploy command: {}'.format(cmd))
         r = os.system(cmd)
         if r != 0:
             raise Exception('Deploy "%s" returned exit code %d' % (cmd, r))
@@ -353,6 +434,10 @@ class KafkaBrokerApp (trivup.App):
 
         self.conf['destdir'] = destdir
         self.conf['bindir'] = os.path.join(self.conf['destdir'], 'bin')
+
+        if self.kraft:
+            self.kraft_setup()
+
         # Override start command with updated path.
         self.conf['start_cmd'] = '%s/bin/kafka-server-start.sh %s' % \
                                  (destdir, self.conf['conf_file'])
