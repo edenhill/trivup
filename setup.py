@@ -11,11 +11,10 @@ for d in glob('trivup/apps/*App'):
                   if x[-1:] != '~']
 
 setup(name='trivup',
-      version='0.8.3',
+      version='0.9.0',
       description='Trivially Up a cluster of programs, such as a Kafka cluster',  # noqa: E501
       author='Magnus Edenhill',
       author_email='magnus@edenhill.se',
       url='https://github.com/edenhill/trivup',
       packages=find_packages(),
-      package_data=data
-)
+      package_data=data)
