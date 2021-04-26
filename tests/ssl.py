@@ -11,9 +11,19 @@ if __name__ == '__main__':
     ssl = SslApp(cluster)
 
     a = ssl.create_keystore('mybroker')
-    print('created keystore: %s' % a)
+    print('created keystore: %s' % (a,))
 
     r = ssl.create_cert('myclient')
+    print('created key: %s' % r)
+
+    r = ssl.create_cert('selfsigned_myclient', with_ca=False)
+    print('created key: %s' % r)
+
+    r = ssl.create_cert('intermediate_myclient', through_intermediate=True)
+    print('created key: %s' % r)
+
+    r = ssl.create_cert('selfsigned_intermediate_myclient',
+                        with_ca=False, through_intermediate=True)
     print('created key: %s' % r)
 
     cluster.cleanup(keeptypes=[])
