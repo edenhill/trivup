@@ -219,9 +219,6 @@ class KafkaBrokerApp (trivup.App):
                  self.conf['advertised.listeners'])
 
         if not self.kraft:
-            conf_blob.append('zookeeper.connect={}'.format(
-                self.conf['zk_connect']))
-
             # SimpleAclAuthorizer doesn't work with KRaft, for some reason.
             # Will investigate later.
             conf_blob.append('authorizer.class.name=kafka.security.auth.SimpleAclAuthorizer')   # noqa: E501
