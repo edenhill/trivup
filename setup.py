@@ -16,5 +16,12 @@ setup(name='trivup',
       author='Magnus Edenhill',
       author_email='magnus@edenhill.se',
       url='https://github.com/edenhill/trivup',
+      license_files=['LICENSE'],
       packages=find_packages(),
-      package_data=data)
+      package_data=data,
+      classifiers=[
+          "Programming Language :: Python :: 3",
+          "Programming Language :: Python :: 2",
+          "License :: OSI Approved :: BSD License",
+          "Operating System :: OS Independent",
+      ])
