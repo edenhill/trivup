@@ -1,3 +1,9 @@
+# 0.9.0
+
+ * Initial support for Kafka KRaft (run Kafka without Zookeeper).
+   Try it with `python3 -m trivup.clusters.KafkaCluster --kraft 2.8.0`
+ * Support for intermediate and self-signed certificates (by @KJTsanaktsidis).
+
 # 0.8.4
 
  * KafkaCluster: Bump Confluent Platform to 6.1.0
