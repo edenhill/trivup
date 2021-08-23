@@ -46,9 +46,11 @@ import sys
 
 
 class Cluster (object):
-    def __init__(self, name, root_path, nodes=['localhost'], debug=False):
+    def __init__(self, name, root_path, nodes=['localhost'], debug=False,
+                 cleanup=True):
         super(Cluster, self).__init__()
         self.debug = debug
+        self.do_cleanup = cleanup
         self.name = name
         # Generate a uuid for this cluster, may be used as see fit by Apps.
         # The uuid is Base64-encoded (without padding) to match the
@@ -148,6 +150,8 @@ class Cluster (object):
             app.stop(force=force)
 
     def cleanup(self, keeptypes=['perm', 'log']):
+        if not self.do_cleanup:
+            return
         for app in reversed(self.apps):
             app.cleanup(keeptypes=keeptypes)
 

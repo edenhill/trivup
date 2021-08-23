@@ -83,6 +83,8 @@ class KafkaCluster(object):
         'with_sr': False,
         # Debug trivup
         'debug': False,
+        # Cleanup
+        'cleanup': True,
         # Additional broker server.properties configuration
         # 'broker_conf': ['connections.max.idle.ms=1234', ..]
     }
@@ -104,7 +106,8 @@ class KafkaCluster(object):
         self.cluster = Cluster(
             self.__class__.__name__,
             os.environ.get('TRIVUP_ROOT', 'tmp-%s' % self.__class__.__name__),
-            debug=bool(self.conf.get('debug', False)))
+            debug=bool(self.conf.get('debug', False)),
+            cleanup=bool(self.conf.get('cleanup', True)))
 
         self._client_conf = dict()
         self.env = dict()
@@ -435,6 +438,9 @@ if __name__ == '__main__':
     parser.add_argument('--cpversion', dest='cp_version', type=str,
                         default=KafkaCluster.default_conf['cp_version'],
                         help='Confluent Platform version (for Schema-Registry)')  # noqa: E501
+    parser.add_argument('--no-cleanup', dest='no_cleanup', action='store_true',
+                        default=False,
+                        help='Don\'t clean up logs, etc, after cluster is destroyed')
     parser.add_argument('--cmd', type=str, dest='cmd', default=None,
                         help='Command to execute instead of interactive shell')
     parser.add_argument('--kafka-src', dest='kafka_src', type=str,
@@ -453,7 +459,8 @@ if __name__ == '__main__':
             'with_ssl': args.ssl,
             'with_sr': args.sr,
             'broker_cnt': args.broker_cnt,
-            'kafka_path': args.kafka_src}
+            'kafka_path': args.kafka_src,
+            'cleanup': not args.no_cleanup}
 
     kc = KafkaCluster(**conf)
 
