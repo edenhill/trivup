@@ -7,6 +7,7 @@
    passed to the KafkaBrokerApp deploy script if no kafka_path was specified.
  * Clear JMX_PORT env before calling Kafka scripts to avoid
    'port already in use' when setting up SCRAM credentials.
+ * Added tests
 
 
 # 0.9.0

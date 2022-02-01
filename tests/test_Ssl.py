@@ -4,7 +4,7 @@ from trivup.trivup import Cluster
 from trivup.apps.SslApp import SslApp
 
 
-if __name__ == '__main__':
+def test_Ssl():
     cluster = Cluster('TestCluster', 'tmp', debug=True)
 
     # SSL App
@@ -26,4 +26,4 @@ if __name__ == '__main__':
                         with_ca=False, through_intermediate=True)
     print('created key: %s' % r)
 
-    cluster.cleanup(keeptypes=[])
+    cluster.cleanup()
