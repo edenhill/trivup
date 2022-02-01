@@ -252,7 +252,7 @@ class KafkaBrokerApp (trivup.App):
                                              (u, p))
                             # SCRAM users are set up using kafka-configs.sh
                             self.post_start_cmds.append((
-                                '%s --bootstrap-server %s '
+                                'JMX_PORT="" %s --bootstrap-server %s '
                                 '--alter --add-config '
                                 '\'%s=[iterations=4096,password=%s]\' '
                                 '--entity-type users --entity-name \'%s\'') % (
