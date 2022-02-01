@@ -326,7 +326,7 @@ class App (object):
         if conf is None:
             self.conf = dict()
         else:
-            self.conf = deepcopy(conf)
+            self.conf = deepcopy({k:v for k, v in conf.items() if v is not None})
 
         self.conf['appid'] = self.appid
         self.conf['name'] = self.name

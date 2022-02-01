@@ -3,6 +3,8 @@
  * Fix race condition in Cluster.start() where it would check if the cluster
    was operational after each app.start() rather than after starting all apps.
    This only happened if a timeout was provided to Cluster.start()
+ * Clean up app config from None values. This fixes a case where "None" was
+   passed to the KafkaBrokerApp deploy script if no kafka_path was specified.
 
 
 # 0.9.0
