@@ -218,10 +218,7 @@ class KafkaBrokerApp (trivup.App):
         self.dbg('Advertised Listeners: %s' %
                  self.conf['advertised.listeners'])
 
-        if not self.kraft:
-            # SimpleAclAuthorizer doesn't work with KRaft, for some reason.
-            # Will investigate later.
-            self._add_simple_authorizer(conf_blob)
+        self._add_simple_authorizer(conf_blob)
 
         if len(sasl_mechs) > 0:
             self.dbg('SASL mechanisms: %s' % sasl_mechs)
