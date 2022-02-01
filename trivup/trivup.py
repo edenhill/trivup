@@ -140,9 +140,9 @@ class Cluster (object):
         for app in self.apps:
             if app.autostart and app.status() != 'started':
                 app.start()
-            if timeout is not None and not self.wait_operational(timeout):
-                raise Exception('Cluster did not go operational in %ds' %
-                                timeout)
+
+        if timeout is not None and not self.wait_operational(timeout):
+            raise Exception('Cluster did not go operational in %ds' % timeout)
 
     def stop(self, force=False):
         """ Stop all apps in cluster """
