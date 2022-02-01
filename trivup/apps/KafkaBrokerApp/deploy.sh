@@ -70,6 +70,10 @@ if [[ $VERSION == 'trunk' ]]; then
         echo "### $0: Kafka source directory $KAFKA_DIR exists: assuming Kafka is built"
     fi
 
+    if [[ ! -d $DEST_DIR ]]; then
+        mkdir -p $(dirname "$DEST_DIR")
+    fi
+
     # Create a link from DEST_DIR to git tree
     ln -sf "$KAFKA_DIR" "$DEST_DIR"
 
