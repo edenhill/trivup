@@ -510,9 +510,9 @@ class App (object):
         Run any registers post_start_cmds.
         Should only be called once when the cluster is operational.
         """
-        self.dbg('Running %d post_start_cmds' % len(self.post_start_cmds))
         for cmd in self.post_start_cmds:
             try:
+                self.dbg(f"Running post-start command: {cmd}")
                 output = subprocess.check_output(cmd,
                                                  env=dict(os.environ,
                                                           **self.env),
