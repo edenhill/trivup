@@ -87,7 +87,8 @@ class WebServerHandler(BaseHTTPRequestHandler):
             --url localhost:8000/retrieve \
             -H "Accept: application/json" \
             -H "Content-type: application/x-www-form-urlencoded" \
-            -H "Authorization: Basic LW4gYWJjMTIzOlMzY3IzdCEK" \
+            -H "Authorization: Basic LW4gYWJjMTIzOlMzY3IzdCEK \
+                (base64 string generated from CLIENT_ID:CLIENT_SECRET)" \
             -d "grant_type=client_credentials,scope=test-scope"'
             self.wfile.write(message.encode())
             return
@@ -107,30 +108,31 @@ class WebServerHandler(BaseHTTPRequestHandler):
         --url localhost:8000/retrieve \
         -H "Accept: application/json" \
         -H "Content-type: application/x-www-form-urlencoded" \
-        -H "Authorization: Basic LW4gYWJjMTIzOlMzY3IzdCEK" \
+        -H "Authorization: Basic LW4gYWJjMTIzOlMzY3IzdCEK \
+            (base64 string generated from CLIENT_ID:CLIENT_SECRET)"
         -d "grant_type=client_credentials,scope=test-scope"
         """
         if self.headers.get('Content-Length', None) is None:
-            self.send_error(404, 'Content-Length field is required')
+            self.send_error(400, 'Content-Length field is required')
             return
 
         if self.headers.get('Content-type', None) is None:
-            self.send_error(404, 'Content-type field is required')
+            self.send_error(400, 'Content-type field is required')
             return
 
         content_length = int(self.headers['Content-Length'])
         post_data = self.rfile.read(content_length)
 
         if self.headers.get('Authorization', None) is None:
-            self.send_error(404, 'Authorization field is required')
+            self.send_error(400, 'Authorization field is required')
             return
 
         if self.headers.get('Accept', None) != "application/json":
-            self.send_error(404, 'Accept field should be "application/json"')
+            self.send_error(400, 'Accept field should be "application/json"')
             return
 
         if post_data is None:
-            self.send_error(404,
+            self.send_error(400,
                             'grant_type=client_credentials and scope \
                              fields are required in data')
             return
@@ -170,7 +172,7 @@ class WebServerHandler(BaseHTTPRequestHandler):
 
 class OauthbearerOIDCHttpServer():
     def run_http_server(self, port):
-        server = HTTPServer(('', port), WebServerHandler)
+        server = HTTPServer(('localhost', port), WebServerHandler)
         server.serve_forever()
 
 
