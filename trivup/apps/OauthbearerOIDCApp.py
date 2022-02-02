@@ -32,61 +32,43 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from jwcrypto import jwk
 import python_jwt as jwt
 from datetime import datetime, timedelta
+from threading import Lock
 
 import json
 import argparse
 import requests
 
-public_keys = []
-
-
-def generate_token(lifetime, valid=True):
-    private_pem = key.export_to_pem(private_key=True, password=None)
-    private_key = jwk.JWK.from_pem(private_pem)
-
-    payload = {
-        'exp': datetime.utcnow() + timedelta(days=0, seconds=lifetime),
-        'iat': datetime.utcnow(),
-        'iss': "issuer",
-        'sub': "subject",
-        'aud': 'api://default'
-    }
-    header = {
-        "kid": "abcdefg"
-    }
-
-    token = jwt.generate_jwt(payload, private_key, 'RS256',
-                             timedelta(seconds=lifetime), other_headers=header)
-    if not valid:
-        token += "invalid"
-
-    token_map = {"access_token": "%s" % token}
-    return token_map
-
-
-def generate_public_key():
-    global key
-
-    key = jwk.JWK.generate(kty='RSA', size=2048, alg='RS256',
-                           use='sig', kid="abcdefg")
-
-    public_key = key.export_public()
-    public_keys.append(json.loads(public_key))
-
 
 class WebServerHandler(BaseHTTPRequestHandler):
+    def __init__(self):
+        self._key = None
+        self._public_keys = []
+        self._mutex = Lock()
+
+    def __call__(self, *args, **kwargs):
+        """ Handle a request """
+        super().__init__(*args, **kwargs)
+
+    def update_keys(self):
+        self._mutex.acquire()
+        if len(self._public_keys) == 0:
+            public_key, key = self.generate_public_key()
+            self._public_keys.append(json.loads(public_key))
+            self._key = key
+        self._mutex.release()
+
     def do_GET(self):
         if not self.path.endswith("/keys"):
             self.send_response(200)
-            self.send_header('Content-type', 'application/json')
+            self.send_header('Content-Type', 'application/json')
             self.end_headers()
             message = "HTTP server for OAuth\n"
             message += "Example for token retrieval:\n"
             message += 'curl \
             -X POST \
-            --url localhost:8000/retrieve \
+            --url localhost:PORT/retrieve \
             -H "Accept: application/json" \
-            -H "Content-type: application/x-www-form-urlencoded" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
             -H "Authorization: Basic LW4gYWJjMTIzOlMzY3IzdCEK \
                 (base64 string generated from CLIENT_ID:CLIENT_SECRET)" \
             -d "grant_type=client_credentials,scope=test-scope"'
@@ -94,20 +76,53 @@ class WebServerHandler(BaseHTTPRequestHandler):
             return
 
         self.send_response(200)
-        self.send_header('Content-type', 'application/json')
+        self.send_header('Content-Type', 'application/json')
         self.end_headers()
-
-        keys = {"keys": public_keys}
+        self.update_keys()
+        keys = {"keys": self._public_keys}
         self.wfile.write(json.dumps(keys, indent=4).encode())
+
+    def generate_token(self, lifetime, valid=True):
+        self.update_keys()
+        private_pem = self._key.export_to_pem(private_key=True, password=None)
+        private_key = jwk.JWK.from_pem(private_pem)
+
+        payload = {
+            'exp': datetime.utcnow() + timedelta(days=0, seconds=lifetime),
+            'iat': datetime.utcnow(),
+            'iss': "issuer",
+            'sub': "subject",
+            'aud': 'api://default'
+        }
+        header = {
+            "kid": "abcdefg"
+        }
+
+        token = jwt.generate_jwt(payload, private_key, 'RS256',
+                                 timedelta(seconds=lifetime),
+                                 other_headers=header)
+        if not valid:
+            token += "invalid"
+
+        token_map = {"access_token": "%s" % token}
+        return token_map
+
+    def generate_public_key(self):
+
+        key = jwk.JWK.generate(kty='RSA', size=2048, alg='RS256',
+                               use='sig', kid="abcdefg")
+
+        public_key = key.export_public()
+        return (public_key, key)
 
     def generate_valid_token_for_client(self):
         """
         Example usage:
         curl \
         -X POST \
-        --url localhost:8000/retrieve \
+        --url localhost:PORT/retrieve \
         -H "Accept: application/json" \
-        -H "Content-type: application/x-www-form-urlencoded" \
+        -H "Content-Type: application/x-www-form-urlencoded" \
         -H "Authorization: Basic LW4gYWJjMTIzOlMzY3IzdCEK \
             (base64 string generated from CLIENT_ID:CLIENT_SECRET)"
         -d "grant_type=client_credentials,scope=test-scope"
@@ -116,8 +131,8 @@ class WebServerHandler(BaseHTTPRequestHandler):
             self.send_error(400, 'Content-Length field is required')
             return
 
-        if self.headers.get('Content-type', None) is None:
-            self.send_error(400, 'Content-type field is required')
+        if self.headers.get('Content-Type', None) is None:
+            self.send_error(400, 'Content-Type field is required')
             return
 
         content_length = int(self.headers['Content-Length'])
@@ -138,25 +153,25 @@ class WebServerHandler(BaseHTTPRequestHandler):
             return
 
         self.send_response(200)
-        self.send_header('Content-type', 'application/json')
+        self.send_header('Content-Type', 'application/json')
         self.end_headers()
-        token = generate_token(4)
+        token = self.generate_token(4)
         self.wfile.write(json.dumps(token, indent=4).encode())
 
     def generate_badformat_token_for_client(self):
         self.send_response(200)
-        self.send_header('Content-type', 'application/json')
+        self.send_header('Content-Type', 'application/json')
         self.end_headers()
 
-        token = generate_token(30, False)
+        token = self.generate_token(30, False)
         self.wfile.write(json.dumps(token, indent=4).encode())
 
     def generate_expired_token_for_client(self):
         self.send_response(200)
-        self.send_header('Content-type', 'application/json')
+        self.send_header('Content-Type', 'application/json')
         self.end_headers()
 
-        token = generate_token(-1)
+        token = self.generate_token(-1)
         self.wfile.write(json.dumps(token, indent=4).encode())
 
     def do_POST(self):
@@ -172,7 +187,8 @@ class WebServerHandler(BaseHTTPRequestHandler):
 
 class OauthbearerOIDCHttpServer():
     def run_http_server(self, port):
-        server = HTTPServer(('localhost', port), WebServerHandler)
+        handler = WebServerHandler()
+        server = HTTPServer(('localhost', port), handler)
         server.serve_forever()
 
 
@@ -180,12 +196,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Trivup Oauthbearer OIDC \
                                                   HTTP server')
     parser.add_argument('--port', type=int, dest='port',
-                        default=False, required=True,
+                        required=True,
                         help='Port at which OauthbearerOIDCApp \
                               should be bound')
     args = parser.parse_args()
 
-    generate_public_key()
     http_server = OauthbearerOIDCHttpServer()
     http_server.run_http_server(args.port)
 
@@ -211,6 +226,12 @@ class OauthbearerOIDCApp (trivup.App):
         self.conf['expired_url'] = 'http://localhost:%d/retrieve/expire' % \
             self.conf['port']
         self.conf['jwks_url'] = 'http://localhost:%d/keys' % self.conf['port']
+        self.conf['sasl_oauthbearer_method'] = 'OIDC'
+        self.conf['sasl_oauthbearer_client_id'] = '123'
+        self.conf['sasl_oauthbearer_client_secret'] = 'abc'
+        self.conf['sasl_oauthbearer_scope'] = 'test'
+        self.conf['sasl_oauthbearer_extensions'] = \
+            'ExtensionworkloadIdentity=develC348S,Extensioncluster=lkc123'
 
     def start_cmd(self):
         return "python3 -m trivup.apps.OauthbearerOIDCApp --port %d" \
