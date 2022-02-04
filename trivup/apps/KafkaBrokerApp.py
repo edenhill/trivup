@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
 
-# Copyright (c) 2016-2019, Magnus Edenhill
+# Copyright (c) 2016-2021, Magnus Edenhill
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -29,6 +29,7 @@
 from trivup import trivup
 from trivup.apps.KerberosKdcApp import KerberosKdcApp
 from trivup.apps.SslApp import SslApp
+from trivup.apps.OauthbearerOIDCApp import OauthbearerOIDCApp
 
 from string import Template
 import contextlib
@@ -295,18 +296,31 @@ class KafkaBrokerApp (trivup.App):
                 jaas_blob.append('principal="%s";' % self.kerberos_principal)
 
             if 'OAUTHBEARER' in sasl_mechs:
-                # Use the unsecure JSON web token.
-                # Client should be configured with
-                # 'sasl.oauthbearer.config=scope=requiredScope principal=admin'
-                # Change requiredScope to something else to trigger auth error.
-                conf_blob.append('super.users=User:admin')
-                conf_blob.append('allow.everyone.if.no.acl.found=true')
-                self._add_simple_authorizer(conf_blob)
-                jaas_blob.append('org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required')  # noqa: E501
-                jaas_blob.append('  unsecuredLoginLifetimeSeconds="3600"')
-                jaas_blob.append('  unsecuredLoginStringClaim_sub="admin"')
-                jaas_blob.append('  unsecuredValidatorRequiredScope="requiredScope"')  # noqa: E501
-                jaas_blob.append(';')
+                oidcapp = self.cluster.find_app(OauthbearerOIDCApp)
+                if oidcapp is not None:
+                    # Use the OIDC method.
+                    conf_blob.append('listener.name.sasl_plaintext.oauthbearer.sasl.server.callback.handler.class=org.apache.kafka.common.security.oauthbearer.secured.OAuthBearerValidatorCallbackHandler')
+                    conf_blob.append('listener.name.sasl_plaintext.oauthbearer.sasl.oauthbearer.jwks.endpoint.url=%s' % oidcapp.conf['jwks_url'])
+                    conf_blob.append('listener.name.sasl_plaintext.oauthbearer.sasl.oauthbearer.scope.claim.name=scp')
+                    conf_blob.append('listener.name.sasl_plaintext.oauthbearer.sasl.jaas.config=org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required unsecuredLoginStringClaim_sub="unused";')
+                    conf_blob.append('listener.name.sasl_plaintext.oauthbearer.sasl.oauthbearer.expected.audience=api://default')
+                    conf_blob.append('security.inter.broker.protocol=PLAINTEXT')
+                    conf_blob.append('sasl.enabled.mechanisms=OAUTHBEARER')
+                else:
+                    # Use the unsecure JSON web token.
+                    # Client should be configured with
+                    # 'sasl.oauthbearer.config=scope=requiredScope principal=
+                    # admin'
+                    # Change requiredScope to something else to trigger auth
+                    # error.
+                    conf_blob.append('super.users=User:admin')
+                    conf_blob.append('allow.everyone.if.no.acl.found=true')
+                    self._add_simple_authorizer(conf_blob)
+                    jaas_blob.append('org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required')  # noqa: E501
+                    jaas_blob.append('  unsecuredLoginLifetimeSeconds="3600"')
+                    jaas_blob.append('  unsecuredLoginStringClaim_sub="admin"')
+                    jaas_blob.append('  unsecuredValidatorRequiredScope="requiredScope"')  # noqa: E501
+                    jaas_blob.append(';')
 
             jaas_blob.append('};\n')
             self.conf['jaas_file'] = self.create_file('jaas_broker.conf',

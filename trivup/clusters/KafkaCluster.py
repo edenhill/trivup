@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
 
-# Copyright (c) 2016-2019, Magnus Edenhill
+# Copyright (c) 2016-2021, Magnus Edenhill
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -34,6 +34,7 @@
 #  * KerberosKdcApp (optional, sasl.mechanism=GSSAPI,
 #                    cross-realm if realm_cnt=2)
 #  * SchemaRegistryApp (optional, if with_sr=True)
+#  * OauthbearerOIDCApp (optional, if oidc=True)
 #
 # cluster.env (dict) will contain:
 #      TRIVUP_ROOT
@@ -54,6 +55,7 @@ from trivup.apps.KafkaBrokerApp import KafkaBrokerApp
 from trivup.apps.KerberosKdcApp import KerberosKdcApp
 from trivup.apps.SchemaRegistryApp import SchemaRegistryApp
 from trivup.apps.SslApp import SslApp
+from trivup.apps.OauthbearerOIDCApp import OauthbearerOIDCApp
 
 from copy import deepcopy
 
@@ -85,6 +87,7 @@ class KafkaCluster(object):
         'debug': False,
         # Cleanup
         'cleanup': True,
+        'oidc': False,
         # Additional broker server.properties configuration
         # 'broker_conf': ['connections.max.idle.ms=1234', ..]
     }
@@ -113,6 +116,10 @@ class KafkaCluster(object):
         self.env = dict()
 
         self.sasl_mechanism = self.conf.get('sasl_mechanism')
+
+        # Start a HTTP server
+        if bool(self.conf.get('oidc', False)):
+            self.oidc = OauthbearerOIDCApp(self.cluster)
 
         # Generate SSL certs if enabled
         if bool(self.conf.get('with_ssl')):
@@ -228,9 +235,16 @@ class KafkaCluster(object):
                     break
 
             elif self.sasl_mechanism == 'OAUTHBEARER':
-                self._client_conf['enable.sasl.oauthbearer.unsecure.jwt'] = True  # noqa: E501
-                self._client_conf['sasl.oauthbearer.config'] = \
-                    'scope=requiredScope principal=admin'
+                if self.conf.get('sasl.oauthbearer.method', None) == 'OIDC':
+                    self._client_conf['sasl.oauthbearer.client.id'] = '123'
+                    self._client_conf['sasl.oauthbearer.client.secret'] = 'abc'
+                    self._client_conf['sasl.oauthbearer.scope'] = 'test'
+                    self._client_conf['sasl.oauthbearer.extensions'] = \
+                        'ExtensionworkloadIdentity=develC348S,Extensioncluster=lkc123'
+                else:
+                    self._client_conf['enable.sasl.oauthbearer.unsecure.jwt'] = True  # noqa: E501
+                    self._client_conf['sasl.oauthbearer.config'] = \
+                        'scope=requiredScope principal=admin'
 
         # Client SSL configuration
         if self.ssl is not None:
@@ -448,6 +462,10 @@ if __name__ == '__main__':
                         help='Existing Kafka source directory to use ' +
                         'instead of downloaded release. ' +
                         'Requires --version trunk.')
+    parser.add_argument('--oidc', dest='oidc',
+                        action='store_true',
+                        default=KafkaCluster.default_conf['oidc'],
+                        help='Enable Oauthbearer OIDC JWT server')
 
     args = parser.parse_args()
 
@@ -460,7 +478,8 @@ if __name__ == '__main__':
             'with_sr': args.sr,
             'broker_cnt': args.broker_cnt,
             'kafka_path': args.kafka_src,
-            'cleanup': not args.no_cleanup}
+            'cleanup': not args.no_cleanup,
+            'oidc': args.oidc}
 
     kc = KafkaCluster(**conf)
 
