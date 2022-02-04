@@ -46,7 +46,26 @@ class WebServerHandler(BaseHTTPRequestHandler):
         self._mutex = Lock()
 
     def __call__(self, *args, **kwargs):
-        """ Handle a request """
+        """
+        As it turns out, http.server.BaseHTTPRequestHandler
+        ultimately inherits from socketserver.BaseRequestHandler,
+        and socketserver.BaseRequestHandler.__init__() calls do_GET()
+        and do_POST(). So if we add the super().__init__(*args, **kwargs)
+        to the constructor of WebServerHandler, it means all the
+        instance variables are initialized for each request.
+        But the relevant parts of the JWT are cached in the broker.
+        The only time the broker communicates with the OAuth/OIDC
+        token provider is at a) startup, b) during a scheduled refresh,
+        and c) when it finds a key ID that isn't cached.
+        So we want to keep the same public key for each user in case
+        the broker won't get the new public key immediately.
+        So this method keeps the superclass "constructor"
+        call out of "constructor" of this class which eliminates the
+        possibility of dispatching a request (from the superclass's
+        constructor) before the subclass's constructor is finished
+        to avoid initializing the instance variables.
+        Refer to https://stackoverflow.com/a/58909293
+        """
         super().__init__(*args, **kwargs)
 
     def update_keys(self):
