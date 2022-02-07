@@ -1,5 +1,6 @@
 # 0.9.1
 
+ * Added Oauthbearer/OIDC server app (by @jliunyu, #13)
  * Fix race condition in Cluster.start() where it would check if the cluster
    was operational after each app.start() rather than after starting all apps.
    This only happened if a timeout was provided to Cluster.start()
