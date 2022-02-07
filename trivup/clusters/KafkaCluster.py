@@ -62,6 +62,7 @@ from copy import deepcopy
 import os
 import argparse
 import subprocess
+import copy
 
 
 class KafkaCluster(object):
@@ -103,6 +104,7 @@ class KafkaCluster(object):
             self.conf.update(conf)
 
         self.version = self.conf.get('version')
+        self.version_num = [int(x) for x in self.version.split('.')][:3]
         self.kraft = self.conf.get('kraft')
 
         # Create trivup Cluster
@@ -163,7 +165,16 @@ class KafkaCluster(object):
         # Create brokers (don't start yet)
         self.brokers = dict()
         for n in range(0, broker_cnt):
-            broker = KafkaBrokerApp(self.cluster, self.broker_conf)
+            bconf = copy.deepcopy(self.broker_conf)
+            if self.version_num >= [2, 4, 0]:
+                # Configure rack & replica selector if broker supports
+                # fetch-from-follower
+                bconf.update(
+                    { 'conf': [
+                        'broker.rack=RACK${appid}',
+                        'replica.selector.class=org.apache.kafka.common.replica.RackAwareReplicaSelector']})  # noqa: E501
+
+            broker = KafkaBrokerApp(self.cluster, bconf)
             self.brokers[broker.appid] = broker
 
         # Generate bootstrap servers list
