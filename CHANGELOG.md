@@ -1,6 +1,6 @@
-# 0.9.1
+# 0.10.0
 
- * Added Oauthbearer/OIDC server app (by @jliunyu, #13)
+ * Added Oauthbearer/OIDC ticket server app (by @jliunyu, #13)
  * Fix race condition in Cluster.start() where it would check if the cluster
    was operational after each app.start() rather than after starting all apps.
    This only happened if a timeout was provided to Cluster.start()
@@ -8,8 +8,7 @@
    passed to the KafkaBrokerApp deploy script if no kafka_path was specified.
  * Clear JMX_PORT env before calling Kafka scripts to avoid
    'port already in use' when setting up SCRAM credentials.
- * Added tests
-
+ * Added tests.
 
 # 0.9.0
 

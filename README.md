@@ -11,7 +11,15 @@ The initial use-case is to bring up a simple Kafka cluster for easily testing
 [librdkafka](https://github.com/edenhill/librdkafka) on different
 broker versions.
 
-**NOTE**: It currently only operates on localhost.
+Featured apps:
+
+ * Apache Kafka cluster with optional KRaft (ZooKeeper-less) support
+ * Apache ZooKeeper
+ * Confluent's Schema-Registry
+ * Kerberos 5 KDC for GSSAPI/Kerberos authentication
+ * OAUTHBEARER OIDC JWK ticket server
+ * SSL CA/public/private certificate generation
+
 
 **SECURITY WARNING**: trivup will run unprotected, wide-open, poorly-configured,
                       server applications on your machine, providing an
@@ -24,7 +32,7 @@ broker versions.
 
 To spin up a Kafka cluster with Confluent Schema-Registry:
 
-    $ python -m trivup.clusters.KafkaCluster --sr
+    $ python3 -m trivup.clusters.KafkaCluster --version 3.1.0 --sr
 
 Pass `--help` for more options.
 
@@ -41,7 +49,7 @@ As you exit the sub-shell the cluster will be brought down and deleted:
 
 ## Code example
 
-See [tests/usecase.py](tests/usecase.py) for a code example.
+See [tests/test_KafkaCluster.py](tests/test_KafkaCluster.py) for a code example.
 
 
 ## Requirements
