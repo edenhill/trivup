@@ -298,6 +298,7 @@ class KafkaBrokerApp (trivup.App):
             if 'OAUTHBEARER' in sasl_mechs:
                 oidcapp = self.cluster.find_app(OauthbearerOIDCApp)
                 if oidcapp is not None:
+                    assert self.version >= [3, 1, 0], "OIDC requires Apache Kafka 3.1 or later"
                     # Use the OIDC method.
                     conf_blob.append('listener.name.sasl_plaintext.oauthbearer.sasl.server.callback.handler.class=org.apache.kafka.common.security.oauthbearer.secured.OAuthBearerValidatorCallbackHandler')
                     conf_blob.append('listener.name.sasl_plaintext.oauthbearer.sasl.oauthbearer.jwks.endpoint.url=%s' % oidcapp.conf['jwks_url'])

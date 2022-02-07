@@ -19,6 +19,11 @@ setup(name='trivup',
       license_files=['LICENSE'],
       packages=find_packages(),
       package_data=data,
+      install_requires=[
+          'requests',
+          'jwcrypto',
+          'python_jwt'
+      ],
       classifiers=[
           "Programming Language :: Python :: 3",
           "Programming Language :: Python :: 2",

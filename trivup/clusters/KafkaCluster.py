@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
 
-# Copyright (c) 2016-2021, Magnus Edenhill
+# Copyright (c) 2016-2022, Magnus Edenhill
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -119,9 +119,13 @@ class KafkaCluster(object):
 
         self.sasl_mechanism = self.conf.get('sasl_mechanism')
 
-        # Start a HTTP server
+        # Add OIDC server app
         if bool(self.conf.get('oidc', False)):
             self.oidc = OauthbearerOIDCApp(self.cluster)
+            if not self.sasl_mechanism:
+                self.sasl_mechanism = 'OAUTHBEARER'
+            elif self.sasl_mechanism.upper() != 'OAUTHBEARER':
+                raise RuntimeError(f"OIDC requires sasl.mechanism OAUTHBEARER, not '{self.sasl_mechanism}'")
 
         # Generate SSL certs if enabled
         if bool(self.conf.get('with_ssl')):
@@ -246,7 +250,9 @@ class KafkaCluster(object):
                     break
 
             elif self.sasl_mechanism == 'OAUTHBEARER':
-                if self.conf.get('sasl.oauthbearer.method', None) == 'OIDC':
+                if self.oidc is not None:
+                    self._client_conf['sasl.oauthbearer.method'] = 'OIDC'
+                    self._client_conf['sasl.oauthbearer.token.endpoint.url'] = self.oidc.get('valid_url')  # noqa: E501
                     self._client_conf['sasl.oauthbearer.client.id'] = '123'
                     self._client_conf['sasl.oauthbearer.client.secret'] = 'abc'
                     self._client_conf['sasl.oauthbearer.scope'] = 'test'
