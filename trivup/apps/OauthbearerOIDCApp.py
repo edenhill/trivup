@@ -38,6 +38,7 @@ import json
 import argparse
 import requests
 
+VALID_SCOPE = ['test', 'test-scope', 'api://1234-abcd/.default']
 
 class WebServerHandler(BaseHTTPRequestHandler):
     def __init__(self):
@@ -134,6 +135,34 @@ class WebServerHandler(BaseHTTPRequestHandler):
         public_key = key.export_public()
         return (public_key, key)
 
+    def valid_post_data(self, post_data):
+        if post_data is None:
+            self.send_error(400,
+                            'grant_type=client_credentials and scope \
+                             fields are required in data')
+            return False
+
+        post_data = post_data.decode("utf-8")
+
+        if post_data == "grant_type=client_credentials":
+            return True
+
+        if not post_data.startswith("grant_type=client_credentials&scope="):
+            self.send_error(400,
+                            'format of data should be grant_type='
+                            'client_credentials&scope=scope_value')
+            return False
+
+        index_begin_scope = len("grant_type=client_credentials&scope=")
+        scope = post_data[index_begin_scope:]
+        if scope not in VALID_SCOPE:
+            self.send_error(400,
+                            'Invalid scope, scope should be "test",'
+                            '"test-scope" or "api://1234-abcd/.default"')
+            return False
+
+        return True
+
     def generate_valid_token_for_client(self):
         """
         Example usage:
@@ -157,18 +186,15 @@ class WebServerHandler(BaseHTTPRequestHandler):
         content_length = int(self.headers['Content-Length'])
         post_data = self.rfile.read(content_length)
 
+        if not self.valid_post_data(post_data):
+            return
+
         if self.headers.get('Authorization', None) is None:
             self.send_error(400, 'Authorization field is required')
             return
 
         if self.headers.get('Accept', None) != "application/json":
             self.send_error(400, 'Accept field should be "application/json"')
-            return
-
-        if post_data is None:
-            self.send_error(400,
-                            'grant_type=client_credentials and scope \
-                             fields are required in data')
             return
 
         self.send_response(200)
