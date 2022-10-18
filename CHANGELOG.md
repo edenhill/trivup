@@ -2,6 +2,8 @@
 
  * SslApp: use DES encryption instead of RC2 for PKCS#12 files, as RC2
    is obsoleted (and disabled by default) in OpenSSL 3.
+ * SslApp: use genpkey instead of deprecated genrsa for generating keys.
+
 # 0.10.0
 
  * Added Oauthbearer/OIDC ticket server app (by @jliunyu, #13)

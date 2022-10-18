@@ -187,7 +187,7 @@ yes""" % d
             ret.update(self._generate_intermediate(cn, with_ca=with_ca))
 
         self.dbg('Generating key for %s: %s' % (cn, ret['priv']['pem']))
-        self.exec_cmd('openssl genrsa -des3 -passout "pass:%s" -out "%s" 2048' %  # noqa: E501
+        self.exec_cmd('openssl genpkey -algorithm RSA -pass "pass:%s" -out "%s"' %  # noqa: E501
                       (password, ret['priv']['pem']))
 
         self.dbg('Generating request for %s: %s' % (cn, ret['req']))
@@ -247,7 +247,7 @@ yes""" % d
 
         self.dbg('Generating key for %s intermediate: %s' %
                  (cn, ret['intermediate_priv']['pem']))
-        self.exec_cmd('openssl genrsa -out "%s" 2048' %  # noqa: E501
+        self.exec_cmd('openssl genpkey -algorithm RSA -out "%s"' %  # noqa: E501
                     (ret['intermediate_priv']['pem']))
         self.dbg('Generating request for %s: %s' %
                  (cn, ret['intermediate_req']))
