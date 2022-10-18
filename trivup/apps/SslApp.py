@@ -288,7 +288,7 @@ yes""" % d
             ['-certfile "{}"'.format(c) for c in additional_certs_for_pkcs12])
 
         self.dbg('Creating PKCS#12 for %s in %s' % (cn, ret['pkcs']))
-        self.exec_cmd('openssl pkcs12 -export -out "%s" -inkey "%s" -in "%s"  %s -passin "pass:%s" -passout "pass:%s"' %  # noqa: E501
+        self.exec_cmd('openssl pkcs12 -export -descert -out "%s" -inkey "%s" -in "%s"  %s -passin "pass:%s" -passout "pass:%s"' %  # noqa: E501
                       (ret['pkcs'],
                        ret['priv']['pem'],
                        ret['pub']['pem'],
