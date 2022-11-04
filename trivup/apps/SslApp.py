@@ -29,6 +29,7 @@
 from trivup import trivup
 
 import os
+import shutil
 from copy import copy
 from textwrap import dedent
 
@@ -60,8 +61,19 @@ class SslApp (trivup.App):
         self.conf.setdefault('ssl_C', 'NN')
         self.conf.setdefault('ssl_user', os.getenv('USER', 'NN'))
 
-        # Generate a CA cert
+        # Generate two CA certs, the first one will be unused and the second
+        # one will be what everything else is signed with.
+        # This allows us to test multi-CA PEMs.
+        self.unused_ca = self.create_ca_cert(self.__class__.__name__ + "_unused")
         self.ca = self.create_ca_cert(self.__class__.__name__)
+
+        # Concatenate both PEMs to a single "all_cas" PEM file,
+        # putting the unused CA first in the file.
+        self.all_cas = {'pem': self.mkpath('all_cas.pem')}
+        with open(self.all_cas['pem'], 'w') as f:
+            for pemfile in [self.unused_ca['pem'], self.ca['pem']]:
+                      with open(pemfile, 'r') as pf:
+                            shutil.copyfileobj(pf, f)
 
     def exec_cmd(self, cmd):
         """ Run command with args, raise exception on failure. """
@@ -283,6 +295,7 @@ yes""" % d
         if through_intermediate:
             additional_certs_for_pkcs12.append(ret['intermediate_pub']['pem'])
         if with_ca:
+            additional_certs_for_pkcs12.append(self.unused_ca['pem'])
             additional_certs_for_pkcs12.append(self.ca['pem'])
         certfile_arguments = ' '.join(
             ['-certfile "{}"'.format(c) for c in additional_certs_for_pkcs12])

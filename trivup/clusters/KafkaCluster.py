@@ -277,6 +277,11 @@ class KafkaCluster(object):
             for k, v in self.ssl.ca.items():
                 self.env['SSL_ca_{}'.format(k)] = v
 
+            for k, v in self.ssl.unused_ca.items():
+                self.env['SSL_unused_ca_{}'.format(k)] = v
+
+            self.env['SSL_all_cas_pem'] = self.ssl.all_cas['pem']
+
             # Set envs for all generated keys so tests can find them.
             for k, v in key.items():
                 if type(v) is dict:

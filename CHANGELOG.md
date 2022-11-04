@@ -1,3 +1,9 @@
+# 0.12.0
+
+ * SslApp now generates an additional unused CA, and a all_cas.pem file
+   that contains all(both) CA certs. This can be used to verify that CA PEMs
+   with multiple unrelated CA certs are properly parsed.
+
 # 0.11.0
 
  * SslApp: use DES encryption instead of RC2 for PKCS#12 files, as RC2
