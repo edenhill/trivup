@@ -126,6 +126,8 @@ class KafkaCluster(object):
                 self.sasl_mechanism = 'OAUTHBEARER'
             elif self.sasl_mechanism.upper() != 'OAUTHBEARER':
                 raise RuntimeError(f"OIDC requires sasl.mechanism OAUTHBEARER, not '{self.sasl_mechanism}'")
+        else:
+            self.oidc = None
 
         # Generate SSL certs if enabled
         if bool(self.conf.get('with_ssl')):
@@ -250,7 +252,7 @@ class KafkaCluster(object):
                     break
 
             elif self.sasl_mechanism == 'OAUTHBEARER':
-                if hasattr(self, 'oidc'):
+                if self.oidc is not None:
                     self._client_conf['sasl.oauthbearer.method'] = 'OIDC'
                     self._client_conf['sasl.oauthbearer.token.endpoint.url'] = self.oidc.get('valid_url')  # noqa: E501
                     self._client_conf['sasl.oauthbearer.client.id'] = '123'
