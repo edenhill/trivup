@@ -173,7 +173,7 @@ class WebServerHandler(BaseHTTPRequestHandler):
         -H "Content-Type: application/x-www-form-urlencoded" \
         -H "Authorization: Basic LW4gYWJjMTIzOlMzY3IzdCEK \
             (base64 string generated from CLIENT_ID:CLIENT_SECRET)"
-        -d "grant_type=client_credentials,scope=test-scope"
+        -d "grant_type=client_credentials&scope=test-scope"
         """
         if self.headers.get('Content-Length', None) is None:
             self.send_error(400, 'Content-Length field is required')

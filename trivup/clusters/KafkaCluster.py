@@ -250,7 +250,7 @@ class KafkaCluster(object):
                     break
 
             elif self.sasl_mechanism == 'OAUTHBEARER':
-                if self.oidc is not None:
+                if hasattr(self, 'oidc'):
                     self._client_conf['sasl.oauthbearer.method'] = 'OIDC'
                     self._client_conf['sasl.oauthbearer.token.endpoint.url'] = self.oidc.get('valid_url')  # noqa: E501
                     self._client_conf['sasl.oauthbearer.client.id'] = '123'
