@@ -118,6 +118,11 @@ class SslApp (trivup.App):
         truststore = self.mkpath('%s.truststore.jks' % cn)
         cert = self.mkpath('%s.cert' % cn)
         signedcert = self.mkpath('%s.signedcert' % cn)
+        extfile = self.mkpath('%s.exts' % cn)
+
+        # Write extensions we need for signed certificate (openssl x509 -req)
+        with open(extfile, 'w') as f:
+            f.write('subjectAltName=DNS:localhost')
 
         d = copy(self.conf)
         d.update({'ssl_CN': cn})
@@ -130,7 +135,7 @@ class SslApp (trivup.App):
 yes""" % d
 
         self.dbg('Generating key for %s: %s' % (cn, keystore))
-        self.exec_cmd('keytool -keyalg RSA -storepass "%s" -keypass "%s" -keystore "%s" -alias localhost -validity 10000 -genkey <<EOF\n%s\nEOF' %  # noqa: E501
+        self.exec_cmd('keytool -keyalg RSA -storepass "%s" -keypass "%s" -keystore "%s" -alias localhost -validity 10000 -genkey -ext SAN=DNS:localhost <<EOF\n%s\nEOF' %  # noqa: E501
                       (self.conf.get('ssl_key_pass'),
                        self.conf.get('ssl_key_pass'),
                        keystore, inblob))
@@ -148,10 +153,11 @@ yes""" % d
                        keystore, cert))
 
         self.dbg('Sign certificate for %s' % cn)
-        self.exec_cmd('openssl x509 -req -CA "%s" -CAkey "%s" -in "%s" -out "%s" -days 10000 -CAcreateserial -passin "pass:%s"' %  # noqa: E501
+        self.exec_cmd('openssl x509 -req -CA "%s" -CAkey "%s" -in "%s" -out "%s" -days 10000 -CAcreateserial -passin "pass:%s" -extfile "%s"' %  # noqa: E501
                       (self.ca['pem'], self.ca['key'],
                        cert, signedcert,
-                       self.conf.get('ssl_key_pass')))
+                       self.conf.get('ssl_key_pass'),
+                       extfile))
 
         self.dbg('Import CA for %s' % cn)
         self.exec_cmd('keytool -storepass "%s" -keypass "%s" -keystore "%s" -alias CARoot -import -file "%s" <<EOF\nyes\nEOF' %  # noqa: E501

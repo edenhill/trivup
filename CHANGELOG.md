@@ -1,3 +1,8 @@
+# 0.12.1
+
+ * SslApp now adds subjectAltName=DNS:localhost to broker keystores so that
+   SSL endpoint verification can be used.
+
 # 0.12.0
 
  * SslApp now generates an additional unused CA, and a all_cas.pem file
