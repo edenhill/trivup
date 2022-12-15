@@ -1,3 +1,8 @@
+# 0.12.2
+
+ * `python3 -m trivup.clusters.KafkaCluster ..` now exits with the
+   interactive shells or --cmd's exit code.
+
 # 0.12.1
 
  * SslApp now adds subjectAltName=DNS:localhost to broker keystores so that

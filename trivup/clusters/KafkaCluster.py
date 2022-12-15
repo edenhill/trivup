@@ -60,6 +60,7 @@ from trivup.apps.OauthbearerOIDCApp import OauthbearerOIDCApp
 from copy import deepcopy
 
 import os
+import sys
 import argparse
 import subprocess
 import copy
@@ -395,7 +396,8 @@ class KafkaCluster(object):
 
     def interactive(self, cmd=None):
         """ Execute an interactive shell that has all the
-            environment variables set. """
+            environment variables set.
+            Returns the shell's exit code (0 for success). """
 
         if cmd is None:
             print('# Interactive mode')
@@ -434,6 +436,8 @@ class KafkaCluster(object):
         if retcode != 0:
             print("# - Shell exited with returncode {}: {}".format(
                 retcode, fullcmd))
+
+        return retcode
 
     def client_conf(self):
         """ Get a dict copy of the client configuration """
@@ -507,9 +511,11 @@ if __name__ == '__main__':
 
     kc = KafkaCluster(**conf)
 
-    kc.interactive(args.cmd)
+    ret = kc.interactive(args.cmd)
 
     print("# Stopping cluster in {}/{}".format(kc.cluster.root_path,
                                                kc.cluster.instance))
 
     kc.stop()
+
+    sys.exit(ret)
