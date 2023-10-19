@@ -197,7 +197,7 @@ class KafkaCluster(object):
         # Create SchemaRegistry if enabled
         if bool(self.conf.get('with_sr', False)):
             self.sr = SchemaRegistryApp(
-                self.cluster, {'version': self.conf.get('cp_version')})
+                self.cluster, {'version': self.conf.get('cp_version'), 'image': self.conf.get('sr_image')})
             self.env['SR_URL'] = self.sr.get('url')
 
         # Create librdkafka client configuration
